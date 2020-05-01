@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!--<filter class="com.logback.example.SampleFilter"/>-->
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %c-%L - %msg%n</Pattern>
+        </encoder>
+    </appender>
+
+
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>/opt/logs/redis.log</file>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %c-%L - %msg%n</Pattern>
+        </encoder>
+    </appender>
+
+
+    <root level="info">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+
+
+    <!--以org.springframework开头的日志级别为error-->
+    <logger name="org.springframework" level="warn"/>
+
+    <logger name="com.alibaba.druid" level="off"/>
+
+    <logger name="jdbc.audit" level="off"/>
+    <logger name="jdbc.sqlonly" level="off"/>
+    <logger name="jdbc.sqltiming" level="off"/>
+    <logger name="jdbc.resultset" level="off"/>
+    <logger name="jdbc.connection" level="off"/>
+
+
+
+</configuration>
