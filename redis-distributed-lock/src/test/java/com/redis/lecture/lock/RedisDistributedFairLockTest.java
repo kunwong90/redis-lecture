@@ -3,100 +3,60 @@ package com.redis.lecture.lock;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import javax.annotation.Resource;
+import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.IntStream;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:spring/spring-service.xml"})
 public class RedisDistributedFairLockTest {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(RedisDistributedFairLockTest.class);
 
     @Resource
     private RedisDistributedFairLock fairLock;
 
     private ThreadPoolExecutor threadPoolExecutor;
 
+    @Resource
+    private RedisTemplate<String, String> redisTemplate;
+
     @Before
     public void before() {
-        threadPoolExecutor = new ThreadPoolExecutor(100, 200, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(10000));
+        redisTemplate.delete("key");
+        threadPoolExecutor = new ThreadPoolExecutor(5, 5, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(10000));
     }
 
     @Test
     public void lockTest() throws InterruptedException {
 
-        IntStream.range(0, 25).forEach(value -> {
+        for (int i = 0; i < 30; i++) {
             threadPoolExecutor.execute(() -> {
                 long start = System.currentTimeMillis();
                 String key = "test";
-                boolean result = fairLock.lock(key, 2, TimeUnit.SECONDS);
+                boolean result = fairLock.lock(key, 20, TimeUnit.SECONDS);
+                //LOGGER.info("result = {}", result);
                 System.out.println(result);
-                /*try {
-                    TimeUnit.SECONDS.sleep(1);
-                } catch (Exception e) {
-
-                } finally {
-                    fairLock.unlock(key);
-                }*/
-                System.out.println("time cost = " + (System.currentTimeMillis() - start));
-            });
-        });
-
-        IntStream.range(0, 40).forEach(value -> {
-            threadPoolExecutor.execute(() -> {
-                long start = System.currentTimeMillis();
-                String key = "test1";
-                boolean result = fairLock.lock(key, 10, TimeUnit.SECONDS);
-                System.out.println(result);
+                System.out.println(Instant.now().toString());
                 try {
                     TimeUnit.SECONDS.sleep(1);
                 } catch (Exception e) {
 
                 } finally {
                     fairLock.unlock(key);
+                    System.out.println(Instant.now().toString());
+                    //LOGGER.info("release lock success.time cost = {}", (System.currentTimeMillis() - start));
                 }
-                System.out.println("time cost = " + (System.currentTimeMillis() - start));
             });
-        });
-
-        IntStream.range(0, 25).forEach(value -> {
-            threadPoolExecutor.execute(() -> {
-                long start = System.currentTimeMillis();
-                String key = "test2";
-                boolean result = fairLock.lock(key, 10, TimeUnit.SECONDS);
-                System.out.println(result);
-                try {
-                    TimeUnit.SECONDS.sleep(1);
-                } catch (Exception e) {
-
-                } finally {
-                    fairLock.unlock(key);
-                }
-                System.out.println("time cost = " + (System.currentTimeMillis() - start));
-            });
-        });
-        IntStream.range(0, 30).forEach(value -> {
-            threadPoolExecutor.execute(() -> {
-                long start = System.currentTimeMillis();
-                String key = "test3";
-                boolean result = fairLock.lock(key, 10, TimeUnit.SECONDS);
-                System.out.println(result);
-                try {
-                    TimeUnit.SECONDS.sleep(1);
-                } catch (Exception e) {
-
-                } finally {
-                    fairLock.unlock(key);
-                }
-                System.out.println("time cost = " + (System.currentTimeMillis() - start));
-            });
-        });
-
-
-        //threadPoolExecutor.awaitTermination(50, TimeUnit.SECONDS);
+        }
+        threadPoolExecutor.awaitTermination(3, TimeUnit.MINUTES);
     }
 }

@@ -28,9 +28,6 @@ public class RedisDistributedFairLock {
      */
     private final long threadWaitTime = 5000;
 
-    @Resource
-    private RedisDistributedLock redisDistributedLock;
-
     private static final String LUA_SCRIPT = "while true do " +
             "local firstThreadId2 = redis.call('lindex', KEYS[2], 0);" +
             "if firstThreadId2 == false then " +
@@ -115,47 +112,43 @@ public class RedisDistributedFairLock {
 
     private static final String PREFIX_LIST_QUEUE_NAME = "distributed_lock_queue:";
 
-    private static final String PREFIX_KEY_NAME = "REDIS:DISTRIBUTE:LOCK:";
-
     public boolean lock(String key, long time, TimeUnit timeUnit) {
         /**
-         * 先判断队列是否有等待的，如果有，排队
-         * 没有则尝试获取锁，获取失败进队列
+         * 直接先放队列中，如果队列中的元素为1，则直接尝试获取锁，获取锁失败则自旋尝试获取锁
          */
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
-        Long listSize = redisTemplate.opsForList().size(listKey);
-        String value = key + ":" + Thread.currentThread().getId() + ":" + System.nanoTime();
-        LOGGER.info("value = {}, listSize = {}", value, listSize);
-        if (listSize == null || listSize == 0) {
-            // 先入对再获取锁
-            redisTemplate.opsForList().rightPush(listKey, value);
-            String nanoTime = String.valueOf(System.nanoTime());
-            LOGGER.info(Thread.currentThread().getId() + "==首次加锁==" + nanoTime);
-            threadLocal.set(nanoTime);
-            Boolean result = redisTemplate.opsForValue().setIfAbsent(key, nanoTime, time, timeUnit);
-            if (result != null && result) {
-                // list为空时是自动删除该key
-                redisTemplate.opsForList().leftPop(listKey);
-                // 获取锁成功
+        String threadId = String.valueOf(Thread.currentThread().getId());
+        String value = key + ":" + threadId + ":" + System.nanoTime();
+        LOGGER.info("value = " + value);
+        redisTemplate.opsForList().rightPush(listKey, value);
+        /*Long listSize = redisTemplate.opsForList().size(listKey);
+        if (listSize != null && listSize == 1) {
+            // 直接获取锁
+            Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
+            if (success != null && success) {
+                threadLocal.set(value);
+                String popValue = redisTemplate.opsForList().leftPop(listKey);
+                LOGGER.info("首次获取锁成功 = {}, value = {}, popValue = {}", value, value, popValue);
                 return true;
             }
-        } else {
-            // 已经有了，直接入队
-            redisTemplate.opsForList().rightPush(listKey, value);
-        }
+        }*/
         while (true) {
             String result = redisTemplate.opsForList().index(listKey, 0);
             LOGGER.info("pushValue = {}, popValue = {}", value, result);
             if (StringUtils.isEquals(value, result)) {
-                String nanoTime = String.valueOf(System.nanoTime());
-                threadLocal.set(nanoTime);
-                LOGGER.info(Thread.currentThread().getId() + "==重试获取锁==" + nanoTime);
-                Boolean success = redisTemplate.opsForValue().setIfAbsent(key, nanoTime, time, timeUnit);
+                Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
                 if (success != null && success) {
+                    threadLocal.set(value);
+                    LOGGER.info("==重新获取锁成功== " + value);
                     redisTemplate.opsForList().leftPop(listKey);
                     // 获取锁成功
                     return true;
                 }
+            }
+            try {
+                TimeUnit.MILLISECONDS.sleep(200);
+            } catch (Exception ignore) {
+
             }
         }
     }
@@ -165,11 +158,11 @@ public class RedisDistributedFairLock {
      */
     public void unlock(String key) {
         try {
-            String nanoTime = threadLocal.get();
-            LOGGER.info(Thread.currentThread().getId() + "==释放锁==" + nanoTime);
+            String threadId = threadLocal.get();
+            LOGGER.info("==释放锁==" + threadId);
             // 如果业务执行时间过长导致锁自动释放(key时间过期自动删除),当前线程认为自己当前还持有锁
             RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == KEYS[2] then return redis.call('del', KEYS[1]) else return 0 end", Boolean.class);
-            redisTemplate.execute(redisScript, Arrays.asList(key, nanoTime));
+            redisTemplate.execute(redisScript, Arrays.asList(key, threadId));
         } finally {
             threadLocal.remove();
         }
