@@ -32,31 +32,31 @@ public class RedisDistributedFairLockTest {
     @Before
     public void before() {
         redisTemplate.delete("key");
-        threadPoolExecutor = new ThreadPoolExecutor(5, 5, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(10000));
+        threadPoolExecutor = new ThreadPoolExecutor(200, 500, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(10000));
     }
 
     @Test
     public void lockTest() throws InterruptedException {
 
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 10; i++) {
             threadPoolExecutor.execute(() -> {
-                long start = System.currentTimeMillis();
+                System.out.println(Thread.currentThread().getId() + ",开始执行时间:" + Instant.now().toString());
                 String key = "test";
-                boolean result = fairLock.lock(key, 20, TimeUnit.SECONDS);
+                boolean result = fairLock.lock(key, 2, TimeUnit.SECONDS);
                 //LOGGER.info("result = {}", result);
                 System.out.println(result);
-                System.out.println(Instant.now().toString());
+                System.out.println("获取锁成功时间:" + Instant.now().toString());
                 try {
-                    TimeUnit.SECONDS.sleep(1);
+                    TimeUnit.SECONDS.sleep(2);
                 } catch (Exception e) {
 
                 } finally {
                     fairLock.unlock(key);
-                    System.out.println(Instant.now().toString());
+                    System.out.println("释放锁成功时间:" + Instant.now().toString());
                     //LOGGER.info("release lock success.time cost = {}", (System.currentTimeMillis() - start));
                 }
             });
         }
-        threadPoolExecutor.awaitTermination(3, TimeUnit.MINUTES);
+        threadPoolExecutor.awaitTermination(1,  TimeUnit.MINUTES);
     }
 }

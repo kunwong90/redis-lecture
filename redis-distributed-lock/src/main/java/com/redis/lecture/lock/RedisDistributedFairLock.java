@@ -1,137 +1,52 @@
 package com.redis.lecture.lock;
 
+import com.alibaba.fastjson.JSON;
+import com.redis.lecture.util.CollectionUtils;
 import com.redis.lecture.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
  * redis实现的分布式公平锁
  */
 @Component
-public class RedisDistributedFairLock {
+public class RedisDistributedFairLock implements InitializingBean {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RedisDistributedFairLock.class);
 
     @Resource
     private RedisTemplate<String, String> redisTemplate;
 
-    /**
-     * 单位毫秒
-     */
-    private final long threadWaitTime = 5000;
-
-    private static final String LUA_SCRIPT = "while true do " +
-            "local firstThreadId2 = redis.call('lindex', KEYS[2], 0);" +
-            "if firstThreadId2 == false then " +
-            "break;" +
-            "end;" +
-
-            "local timeout = tonumber(redis.call('zscore', KEYS[3], firstThreadId2));" +
-            "if timeout <= tonumber(ARGV[4]) then " +
-            // remove the item from the queue and timeout set
-            // NOTE we do not alter any other timeout
-            "redis.call('zrem', KEYS[3], firstThreadId2);" +
-            "redis.call('lpop', KEYS[2]);" +
-            "else " +
-            "break;" +
-            "end;" +
-            "end;" +
-
-            // check if the lock can be acquired now
-            "if (redis.call('exists', KEYS[1]) == 0) " +
-            "and ((redis.call('exists', KEYS[2]) == 0) " +
-            "or (redis.call('lindex', KEYS[2], 0) == ARGV[2])) then " +
-
-            // remove this thread from the queue and timeout set
-            "redis.call('lpop', KEYS[2]);" +
-            "redis.call('zrem', KEYS[3], ARGV[2]);" +
-
-            // decrease timeouts for all waiting in the queue
-            "local keys = redis.call('zrange', KEYS[3], 0, -1);" +
-            "for i = 1, #keys, 1 do " +
-            "redis.call('zincrby', KEYS[3], -tonumber(ARGV[3]), keys[i]);" +
-            "end;" +
-
-            // acquire the lock and set the TTL for the lease
-            "redis.call('hset', KEYS[1], ARGV[2], 1);" +
-            "redis.call('pexpire', KEYS[1], ARGV[1]);" +
-            "return nil;" +
-            "end;" +
-
-            // check if the lock is already held, and this is a re-entry
-            "if redis.call('hexists', KEYS[1], ARGV[2]) == 1 then " +
-            "redis.call('hincrby', KEYS[1], ARGV[2],1);" +
-            "redis.call('pexpire', KEYS[1], ARGV[1]);" +
-            "return nil;" +
-            "end;" +
-
-            // the lock cannot be acquired
-            // check if the thread is already in the queue
-            "local timeout = redis.call('zscore', KEYS[3], ARGV[2]);" +
-            "if timeout ~= false then " +
-            // the real timeout is the timeout of the prior thread
-            // in the queue, but this is approximately correct, and
-            // avoids having to traverse the queue
-            "return timeout - tonumber(ARGV[3]) - tonumber(ARGV[4]);" +
-            "end;" +
-
-            // add the thread to the queue at the end, and set its timeout in the timeout set to the timeout of
-            // the prior thread in the queue (or the timeout of the lock if the queue is empty) plus the
-            // threadWaitTime
-            "local lastThreadId = redis.call('lindex', KEYS[2], -1);" +
-            "local ttl;" +
-            "if lastThreadId ~= false and lastThreadId ~= ARGV[2] then " +
-            "ttl = tonumber(redis.call('zscore', KEYS[3], lastThreadId)) - tonumber(ARGV[4]);" +
-            "else " +
-            "ttl = redis.call('pttl', KEYS[1]);" +
-            "end;" +
-            "local timeout = ttl + tonumber(ARGV[3]) + tonumber(ARGV[4]);" +
-            "if redis.call('zadd', KEYS[3], timeout, ARGV[2]) == 1 then " +
-            "redis.call('rpush', KEYS[2], ARGV[2]);" +
-            "end;" +
-            "return ttl;";
-
-
-
-    /*public void lock(String key, long time, TimeUnit timeUnit) {
-        RedisScript<Long> redisScript = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
-        List<String> keys = Arrays.asList(key, prefixName("redisson_lock_queue", key), prefixName("redisson_lock_timeout", key));
-        long internalLockLeaseTime = timeUnit.toMillis(time);
-        redisTemplate.execute(redisScript, keys, String.valueOf(internalLockLeaseTime), String.valueOf(Thread.currentThread().getId()), String.valueOf(threadWaitTime), String.valueOf(System.currentTimeMillis()));
-    }*/
+    @Resource
+    private RedisDistributedLock redisDistributedLock;
 
     private ThreadLocal<String> threadLocal = new ThreadLocal<>();
 
     private static final String PREFIX_LIST_QUEUE_NAME = "distributed_lock_queue:";
 
+    //private static final String PREFIX_ZSET_TIMEOUT_NAME = "distributed_lock_timeout:";
+
     public boolean lock(String key, long time, TimeUnit timeUnit) {
-        /**
-         * 直接先放队列中，如果队列中的元素为1，则直接尝试获取锁，获取锁失败则自旋尝试获取锁
-         */
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
         String threadId = String.valueOf(Thread.currentThread().getId());
-        String value = key + ":" + threadId + ":" + System.nanoTime();
+        String value = key + ":" + threadId + ":" + UUID.randomUUID().toString();
         LOGGER.info("value = " + value);
         redisTemplate.opsForList().rightPush(listKey, value);
-        /*Long listSize = redisTemplate.opsForList().size(listKey);
-        if (listSize != null && listSize == 1) {
-            // 直接获取锁
-            Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
-            if (success != null && success) {
-                threadLocal.set(value);
-                String popValue = redisTemplate.opsForList().leftPop(listKey);
-                LOGGER.info("首次获取锁成功 = {}, value = {}, popValue = {}", value, value, popValue);
-                return true;
-            }
-        }*/
         while (true) {
             String result = redisTemplate.opsForList().index(listKey, 0);
             LOGGER.info("pushValue = {}, popValue = {}", value, result);
@@ -139,7 +54,7 @@ public class RedisDistributedFairLock {
                 Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
                 if (success != null && success) {
                     threadLocal.set(value);
-                    LOGGER.info("==重新获取锁成功== " + value);
+                    LOGGER.info("==自旋获取锁成功== " + value);
                     redisTemplate.opsForList().leftPop(listKey);
                     // 获取锁成功
                     return true;
@@ -179,5 +94,30 @@ public class RedisDistributedFairLock {
             return prefix + ":" + name;
         }
         return prefix + ":{" + name + "}";
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        try {
+            Set<String> queueKeys = scan(PREFIX_LIST_QUEUE_NAME);
+            //LOGGER.info("需要删除的keys = {}", JSON.toJSONString(queueKeys));
+            System.out.println("需要删除的keys = " + JSON.toJSONString(queueKeys));
+            if (CollectionUtils.isNotEmpty(queueKeys)) {
+                redisTemplate.delete(queueKeys);
+            }
+        } catch (Exception e) {
+            LOGGER.error("scan exception", e);
+        }
+    }
+
+    public Set<String> scan(String matchKey) {
+        return redisTemplate.execute((RedisCallback<Set<String>>) connection -> {
+            Set<String> keysTmp = new HashSet<>();
+            Cursor<byte[]> cursor = connection.scan(new ScanOptions.ScanOptionsBuilder().match(matchKey + "*").count(1000).build());
+            while (cursor.hasNext()) {
+                keysTmp.add(new String(cursor.next()));
+            }
+            return keysTmp;
+        });
     }
 }
