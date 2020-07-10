@@ -12,11 +12,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -41,10 +37,7 @@ public class RedisDistributedFairLock {
 
     private RedisDistributedFairLock() {
         this.uuid = UUID.randomUUID();
-        System.err.println(uuid.toString());
     }
-
-    //private static final String PREFIX_ZSET_TIMEOUT_NAME = "distributed_lock_timeout:";
 
     private static final String LUA_DELETE_LIST = "local list = redis.call('lrange', KEYS[1], 0, -1);" +
             "for index,value in pairs(list) do local prefix = ARGV[1];" +
@@ -55,17 +48,9 @@ public class RedisDistributedFairLock {
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
         String threadId = String.valueOf(Thread.currentThread().getId());
         String value = uuid.toString() + ":" + key + ":" + threadId + ":" + UUID.randomUUID().toString();
-        /*List<String> listValues = redisTemplate.opsForList().range(listKey, 0, -1);
-        if (CollectionUtils.isNotEmpty(listValues)) {
-            for (String value1 : listValues) {
-                if (!value1.startsWith(uuid.toString())) {
-                    redisTemplate.opsForList().remove(listKey, 0, value1);
-                }
-            }
-        }*/
+        LOGGER.info("value = " + value);
         RedisScript<Void> redisScript = new DefaultRedisScript<>(LUA_DELETE_LIST, Void.class);
         redisTemplate.execute(redisScript, Collections.singletonList(listKey), uuid.toString());
-        LOGGER.info("value = " + value);
         redisTemplate.opsForList().rightPush(listKey, value);
         while (true) {
             String result = redisTemplate.opsForList().index(listKey, 0);
