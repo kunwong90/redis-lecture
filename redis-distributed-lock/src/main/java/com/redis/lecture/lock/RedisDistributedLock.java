@@ -50,8 +50,8 @@ public class RedisDistributedLock {
     public boolean tryLock(String key, long time, TimeUnit timeUnit) {
         String nanoTime = String.valueOf(System.nanoTime());
         try {
-            boolean result = redisTemplate.opsForValue().setIfAbsent(key, nanoTime, time, timeUnit);
-            if (result) {
+            Boolean result = redisTemplate.opsForValue().setIfAbsent(key, nanoTime, time, timeUnit);
+            if (result != null && result) {
                 threadLocal.set(nanoTime);
                 TIMER.newTimeout(new TimerTask() {
                     @Override
@@ -68,14 +68,16 @@ public class RedisDistributedLock {
                         String value = (String) pipelineResult.get(1);
                         LOGGER.info("expire = {}, value = {}", expire, value);
                         if (expire != null && expire > 0 && StringUtils.isEquals(value, nanoTime)) {
-                            boolean result = redisTemplate.expire(key, time, timeUnit);
-                            LOGGER.info("key:{}, set expire result = {}", key, result);
+                            Boolean expireResult = redisTemplate.expire(key, time, timeUnit);
+                            LOGGER.info("key:{}, set expire result = {}", key, expireResult);
                             TIMER.newTimeout(this, time - 1, timeUnit);
                         } else if (!StringUtils.isEquals(value, nanoTime)) {
                             LOGGER.warn("get redis value not equals.init value = {}, redis value = {}", nanoTime, value);
                         }
                     }
                 }, time - 1, timeUnit);
+            } else {
+                return false;
             }
             return result;
         } catch (Exception e) {
