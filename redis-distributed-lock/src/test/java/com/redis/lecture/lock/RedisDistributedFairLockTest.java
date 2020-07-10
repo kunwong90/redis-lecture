@@ -6,14 +6,18 @@ import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import javax.annotation.Resource;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = {"classpath:spring/spring-service.xml"})
@@ -29,6 +33,16 @@ public class RedisDistributedFairLockTest {
     @Resource
     private RedisTemplate<String, String> redisTemplate;
 
+    private static final String LUA_DELETE_LIST = "local list = redis.call('lrange', KEYS[1], 0, -1);" +
+            "for index,value in pairs(list) do local prefix = ARGV[1];" +
+            "if (string.sub(value, 0, #prefix) ~= prefix) then redis.call('LREM', KEYS[1], 0, value); end end";
+
+    @Test
+    public void luaTest() {
+        RedisScript<Void> redisScript = new DefaultRedisScript<>(LUA_DELETE_LIST, Void.class);
+        redisTemplate.execute(redisScript, Collections.singletonList("distributed_lock_queue:test"), "test");
+    }
+
     @Before
     public void before() {
         redisTemplate.delete("key");
@@ -37,8 +51,8 @@ public class RedisDistributedFairLockTest {
 
     @Test
     public void lockTest() throws InterruptedException {
+        IntStream.range(0, 20).forEach(value -> {
 
-        for (int i = 0; i < 10; i++) {
             threadPoolExecutor.execute(() -> {
                 System.out.println(Thread.currentThread().getId() + ",开始执行时间:" + Instant.now().toString());
                 String key = "test";
@@ -56,7 +70,7 @@ public class RedisDistributedFairLockTest {
                     //LOGGER.info("release lock success.time cost = {}", (System.currentTimeMillis() - start));
                 }
             });
-        }
-        threadPoolExecutor.awaitTermination(1,  TimeUnit.MINUTES);
+        });
+        threadPoolExecutor.awaitTermination(2, TimeUnit.MINUTES);
     }
 }

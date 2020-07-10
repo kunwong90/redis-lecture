@@ -1,11 +1,8 @@
 package com.redis.lecture.lock;
 
-import com.alibaba.fastjson.JSON;
-import com.redis.lecture.util.CollectionUtils;
 import com.redis.lecture.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -16,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -25,26 +23,48 @@ import java.util.concurrent.TimeUnit;
  * redis实现的分布式公平锁
  */
 @Component
-public class RedisDistributedFairLock implements InitializingBean {
+public class RedisDistributedFairLock {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RedisDistributedFairLock.class);
 
     @Resource
     private RedisTemplate<String, String> redisTemplate;
 
-    @Resource
-    private RedisDistributedLock redisDistributedLock;
-
     private ThreadLocal<String> threadLocal = new ThreadLocal<>();
 
     private static final String PREFIX_LIST_QUEUE_NAME = "distributed_lock_queue:";
 
+    /**
+     * 每次启动生成的一个标识
+     */
+    private final UUID uuid;
+
+    private RedisDistributedFairLock() {
+        this.uuid = UUID.randomUUID();
+        System.err.println(uuid.toString());
+    }
+
     //private static final String PREFIX_ZSET_TIMEOUT_NAME = "distributed_lock_timeout:";
+
+    private static final String LUA_DELETE_LIST = "local list = redis.call('lrange', KEYS[1], 0, -1);" +
+            "for index,value in pairs(list) do local prefix = ARGV[1];" +
+            "if (string.sub(value, 0, #prefix) ~= prefix) then redis.call('LREM', KEYS[1], 0, value); end end";
+
 
     public boolean lock(String key, long time, TimeUnit timeUnit) {
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
         String threadId = String.valueOf(Thread.currentThread().getId());
-        String value = key + ":" + threadId + ":" + UUID.randomUUID().toString();
+        String value = uuid.toString() + ":" + key + ":" + threadId + ":" + UUID.randomUUID().toString();
+        /*List<String> listValues = redisTemplate.opsForList().range(listKey, 0, -1);
+        if (CollectionUtils.isNotEmpty(listValues)) {
+            for (String value1 : listValues) {
+                if (!value1.startsWith(uuid.toString())) {
+                    redisTemplate.opsForList().remove(listKey, 0, value1);
+                }
+            }
+        }*/
+        RedisScript<Void> redisScript = new DefaultRedisScript<>(LUA_DELETE_LIST, Void.class);
+        redisTemplate.execute(redisScript, Collections.singletonList(listKey), uuid.toString());
         LOGGER.info("value = " + value);
         redisTemplate.opsForList().rightPush(listKey, value);
         while (true) {
@@ -94,20 +114,6 @@ public class RedisDistributedFairLock implements InitializingBean {
             return prefix + ":" + name;
         }
         return prefix + ":{" + name + "}";
-    }
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        try {
-            Set<String> queueKeys = scan(PREFIX_LIST_QUEUE_NAME);
-            //LOGGER.info("需要删除的keys = {}", JSON.toJSONString(queueKeys));
-            System.out.println("需要删除的keys = " + JSON.toJSONString(queueKeys));
-            if (CollectionUtils.isNotEmpty(queueKeys)) {
-                redisTemplate.delete(queueKeys);
-            }
-        } catch (Exception e) {
-            LOGGER.error("scan exception", e);
-        }
     }
 
     public Set<String> scan(String matchKey) {
