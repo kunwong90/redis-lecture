@@ -51,84 +51,34 @@ public class RedisDistributedFairLock {
 
     public boolean lock(String key, long time, TimeUnit timeUnit) {
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
-        String threadId = String.valueOf(Thread.currentThread().getId());
-        String value = uuid.toString() + ":" + key + ":" + threadId + ":" + UUID.randomUUID().toString();
-        //LOGGER.info("value = " + value);
-        RedisScript<Void> redisScript = new DefaultRedisScript<>(LUA_DELETE_LIST, Void.class);
-        redisTemplate.execute(redisScript, Collections.singletonList(listKey), uuid.toString(), value);
-        //redisTemplate.opsForList().rightPush(listKey, value);
-        while (true) {
-            String result = redisTemplate.opsForList().index(listKey, 0);
-            //LOGGER.info("pushValue = {}, popValue = {}", value, result);
-            if (StringUtils.isEquals(value, result)) {
-                Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
-                if (success != null && success) {
-                    threadLocal.set(value);
-                    //LOGGER.info("==自旋获取锁成功== " + value);
-                    redisTemplate.opsForList().leftPop(listKey);
-                    // 获取锁成功
-                    return true;
-                }
-            }
-            try {
-                TimeUnit.MILLISECONDS.sleep(200);
-            } catch (Exception ignore) {
-
-            }
-        }
-    }
-
-
-    /**
-     * KEYS[1] list的key
-     * KEYS[2] 是传入的key
-     * ARGV[1] 是应用启动生成的标识
-     * ARGV[2] 是 KEYS[2]对应的value
-     * ARGV[3] 是KEYS[2]的过期时间
-     */
-    private static final String FAIR_LOCK_LUA =
-            "local list = redis.call('lrange', KEYS[1], 0, -1);" +
-                    "for index,value in pairs(list) do " +
-                    "if (string.sub(value, 0, #ARGV[1]) ~= ARGV[1]) then " +
-                    "redis.call('LREM', KEYS[1], 0, value);" +
-                    "end;" +
-                    "end;" +
-                    "redis.call('rpush', KEYS[1], ARGV[2]);" +
-                    "while true do " +
-                    "local firstValue = redis.call('lindex', KEYS[1], 0);" +
-                    "redis.log(redis.LOG_NOTICE, 'key exists = '..redis.call('exists', KEYS[2]));" +
-                    "redis.log(redis.LOG_NOTICE, 'key pttl = '..redis.call('pttl', KEYS[2]));" +
-                    "if firstValue == false then " +
-                    "break;" +
-                    "elseif firstValue == ARGV[2] then " +
-                    "redis.log(redis.LOG_NOTICE, 'equals');" +
-                    "redis.log(redis.LOG_NOTICE, firstValue);" +
-                    "if redis.call('set', KEYS[2], ARGV[2], 'ex', ARGV[3], 'nx') ~= false then " +
-                    //"redis.call('expire', KEYS[2], ARGV[3]);" +
-                    //"redis.log(redis.LOG_NOTICE, redis.call('pttl', KEYS[2]));" +
-                    //"redis.call('del', KEYS[2]);" +
-                    "redis.call('lpop', KEYS[1]);" +
-                    "break;" +
-                    "end;" +
-                    "end;" +
-                    "end;";
-
-    public boolean lockWithLua(String key, long time, TimeUnit timeUnit) {
-        if (timeUnit == null) {
-            timeUnit = TimeUnit.SECONDS;
-        }
-        String listKey = PREFIX_LIST_QUEUE_NAME + key;
+        String identifier = uuid.toString();
         try {
             String threadId = String.valueOf(Thread.currentThread().getId());
-            String identifier = uuid.toString();
             String value = identifier + ":" + key + ":" + threadId + ":" + UUID.randomUUID().toString();
-            LOGGER.info("value = " + value);
-            RedisScript<Void> redisScript = new DefaultRedisScript<>(FAIR_LOCK_LUA, Void.class);
-            redisTemplate.execute(redisScript, Arrays.asList(listKey, key), identifier, value, String.valueOf(timeUnit.toSeconds(time)));
-            threadLocal.set(value);
-            return true;
+            RedisScript<Void> redisScript = new DefaultRedisScript<>(LUA_DELETE_LIST, Void.class);
+            redisTemplate.execute(redisScript, Collections.singletonList(listKey), identifier, value);
+            //redisTemplate.opsForList().rightPush(listKey, value);
+            while (true) {
+                String result = redisTemplate.opsForList().index(listKey, 0);
+                //LOGGER.info("pushValue = {}, popValue = {}", value, result);
+                if (StringUtils.isEquals(value, result)) {
+                    Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
+                    if (success != null && success) {
+                        threadLocal.set(value);
+                        //LOGGER.info("==自旋获取锁成功== " + value);
+                        redisTemplate.opsForList().leftPop(listKey);
+                        // 获取锁成功
+                        return true;
+                    }
+                }
+                try {
+                    TimeUnit.MILLISECONDS.sleep(200);
+                } catch (Exception ignore) {
+
+                }
+            }
         } catch (Exception e) {
-            LOGGER.error("lockWithLua error", e);
+            LOGGER.error("lock error.", e);
             return false;
         }
     }
@@ -151,14 +101,6 @@ public class RedisDistributedFairLock {
 
     public boolean lock(String key, long time) {
         return lock(key, time, TimeUnit.SECONDS);
-    }
-
-
-    public static String prefixName(String prefix, String name) {
-        if (name.contains("{")) {
-            return prefix + ":" + name;
-        }
-        return prefix + ":{" + name + "}";
     }
 
     public Set<String> scan(String matchKey) {
