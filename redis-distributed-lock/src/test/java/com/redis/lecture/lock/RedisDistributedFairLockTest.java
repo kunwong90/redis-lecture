@@ -32,23 +32,23 @@ public class RedisDistributedFairLockTest extends BaseTest {
 
     @Test
     public void lockTest() throws InterruptedException {
-        IntStream.range(0, 100).parallel().forEach(value -> {
-            threadPoolExecutor.execute(() -> {
-                System.out.println(Thread.currentThread().getId() + ",开始执行时间:" + Instant.now().toString());
-                String key = "test";
-                boolean result = fairLock.lock(key, 2);
-                //LOGGER.info("result = {}", result);
-                System.out.println(result);
-                System.out.println("获取锁成功时间:" + Instant.now().toString());
-                try {
-                    TimeUnit.SECONDS.sleep(1);
-                } catch (Exception ignore) {
+        IntStream.range(0, 1).parallel().forEach(value1 -> {
+            IntStream.range(0, 30).parallel().forEach(value -> {
+                threadPoolExecutor.execute(() -> {
+                    String key = "test" + value1;
+                    System.out.println(key + ":" + Thread.currentThread().getId() + ",开始执行时间:" + Instant.now().toString());
+                    boolean result = fairLock.lock(key, 2);
+                    System.out.println(result);
+                    System.out.println(key + " 获取锁成功时间:" + Instant.now().toString());
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (Exception ignore) {
 
-                } finally {
-                    fairLock.unlock(key);
-                    System.out.println("释放锁成功时间:" + Instant.now().toString());
-                    //LOGGER.info("release lock success.time cost = {}", (System.currentTimeMillis() - start));
-                }
+                    } finally {
+                        //fairLock.unlock(key);
+                        System.out.println(key + " 释放锁成功时间:" + Instant.now().toString());
+                    }
+                });
             });
         });
         threadPoolExecutor.awaitTermination(2, TimeUnit.MINUTES);

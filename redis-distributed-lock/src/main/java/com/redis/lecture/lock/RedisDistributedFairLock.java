@@ -1,6 +1,6 @@
 package com.redis.lecture.lock;
 
-import com.redis.lecture.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.Cursor;
@@ -62,11 +62,14 @@ public class RedisDistributedFairLock {
             redisTemplate.execute(redisScript, Collections.singletonList(listKey), identifier, value);
             //redisTemplate.opsForList().rightPush(listKey, value);
             while (true) {
-                String result = redisTemplate.opsForList().index(listKey, 0);
+                String listFirstValue = redisTemplate.opsForList().index(listKey, 0);
                 //LOGGER.info("pushValue = {}, popValue = {}", value, result);
-                if (StringUtils.isEquals(value, result)) {
-                    Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
-                    if (success != null && success) {
+                if (StringUtils.equals(value, listFirstValue)) {
+                    //Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
+                    String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
+                            "if (result ~= false) then return 1; else return 0; end;";
+                    Long result = redisTemplate.execute(new DefaultRedisScript<>(lua, Long.class), Collections.singletonList(key), value, String.valueOf(timeUnit.toSeconds(time)));
+                    if (result != null && result == 1) {
                         threadLocal.set(value);
                         //LOGGER.info("==自旋获取锁成功== " + value);
                         redisTemplate.opsForList().leftPop(listKey);
