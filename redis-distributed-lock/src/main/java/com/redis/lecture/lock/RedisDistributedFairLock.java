@@ -12,7 +12,10 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -79,7 +82,7 @@ public class RedisDistributedFairLock {
             }
         } catch (Exception e) {
             LOGGER.error("lock error.", e);
-            return false;
+            return true;
         }
     }
 
@@ -88,11 +91,13 @@ public class RedisDistributedFairLock {
      */
     public void unlock(String key) {
         try {
-            String threadId = threadLocal.get();
-            LOGGER.info("==释放锁==" + threadId);
+            String value = threadLocal.get();
+            //LOGGER.info("==释放锁==" + threadId);
             // 如果业务执行时间过长导致锁自动释放(key时间过期自动删除),当前线程认为自己当前还持有锁
-            RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == KEYS[2] then return redis.call('del', KEYS[1]) else return 0 end", Boolean.class);
-            redisTemplate.execute(redisScript, Arrays.asList(key, threadId));
+            RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end;", Boolean.class);
+            redisTemplate.execute(redisScript, Collections.singletonList(key), value);
+        } catch (Exception e) {
+          LOGGER.error("unlock error.", e);
         } finally {
             threadLocal.remove();
         }
