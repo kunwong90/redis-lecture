@@ -27,7 +27,7 @@ public class RedisDistributedFairLockTest extends BaseTest {
     @Before
     public void before() {
         redisTemplate.delete("key");
-        threadPoolExecutor = new ThreadPoolExecutor(200, 500, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(100000));
+        threadPoolExecutor = new ThreadPoolExecutor(10, 30, 1, TimeUnit.MINUTES, new ArrayBlockingQueue<>(100000));
     }
 
     @Test
@@ -46,6 +46,31 @@ public class RedisDistributedFairLockTest extends BaseTest {
 
                     } finally {
                         //fairLock.unlock(key);
+                        System.out.println(key + " 释放锁成功时间:" + Instant.now().toString());
+                    }
+                });
+            });
+        });
+        threadPoolExecutor.awaitTermination(2, TimeUnit.MINUTES);
+    }
+
+
+    @Test
+    public void lockProTest() throws InterruptedException {
+        IntStream.range(0, 1).parallel().forEach(value1 -> {
+            IntStream.range(0, 30).parallel().forEach(value -> {
+                threadPoolExecutor.execute(() -> {
+                    String key = "test" + value1;
+                    System.out.println(key + ":" + Thread.currentThread().getId() + ",开始执行时间:" + Instant.now().toString());
+                    boolean result = fairLock.lockPro(key, 2);
+                    System.out.println(result);
+                    System.out.println(key + " 获取锁成功时间:" + Instant.now().toString());
+                    try {
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (Exception ignore) {
+
+                    } finally {
+                        //fairLock1.unlock(key);
                         System.out.println(key + " 释放锁成功时间:" + Instant.now().toString());
                     }
                 });

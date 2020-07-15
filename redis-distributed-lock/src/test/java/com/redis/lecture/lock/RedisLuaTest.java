@@ -187,7 +187,6 @@ public class RedisLuaTest extends BaseTest {
     private void unlock(String key) {
         try {
             String value = threadLocal.get();
-            //LOGGER.info("==释放锁==" + threadId);
             // 如果业务执行时间过长导致锁自动释放(key时间过期自动删除),当前线程认为自己当前还持有锁
             RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end;", Boolean.class);
             redisTemplate.execute(redisScript, Collections.singletonList(key), value);
@@ -221,6 +220,18 @@ public class RedisLuaTest extends BaseTest {
         String lua = "return redis.call('llen', KEYS[1]);";
         RedisScript<Long> redisScript = new DefaultRedisScript<>(lua, Long.class);
         Long result = redisTemplate.execute(redisScript, Collections.singletonList("distributed_lock_queue:test01"));
+        System.out.println(result);
+    }
+
+
+    @Test
+    public void hget() {
+        /**
+         * 没有返回null
+         */
+        String lua = "return redis.call('hget', KEYS[1], KEYS[2]);";
+        RedisScript<String> redisScript = new DefaultRedisScript<>(lua, String.class);
+        String result = redisTemplate.execute(redisScript, Arrays.asList("test1", "field"));
         System.out.println(result);
     }
 }
