@@ -190,7 +190,7 @@ public class RedisLuaTest extends BaseTest {
             //LOGGER.info("==释放锁==" + threadId);
             // 如果业务执行时间过长导致锁自动释放(key时间过期自动删除),当前线程认为自己当前还持有锁
             RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end;", Boolean.class);
-            redisTemplate.execute(redisScript, Arrays.asList(key), value);
+            redisTemplate.execute(redisScript, Collections.singletonList(key), value);
         } catch (Exception e) {
         } finally {
             threadLocal.remove();
@@ -205,10 +205,22 @@ public class RedisLuaTest extends BaseTest {
         String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
                 "if (result ~= false) then return 1; else return 0; end;";
         RedisScript<Long> redisScript = new DefaultRedisScript<>(lua, Long.class);
-        Long result = redisTemplate.execute(redisScript, Arrays.asList("test1"), "value1", String.valueOf(100));
+        Long result = redisTemplate.execute(redisScript, Collections.singletonList("test1"), "value1", String.valueOf(100));
         System.out.println(result);
 
         RedisScript<Boolean> del = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", Boolean.class);
-        redisTemplate.execute(del, Arrays.asList("test1"), "value1");
+        redisTemplate.execute(del, Collections.singletonList("test1"), "value1");
+    }
+
+
+    @Test
+    public void llen() {
+        /**
+         * 成功返回1，失败返回0
+         */
+        String lua = "return redis.call('llen', KEYS[1]);";
+        RedisScript<Long> redisScript = new DefaultRedisScript<>(lua, Long.class);
+        Long result = redisTemplate.execute(redisScript, Collections.singletonList("distributed_lock_queue:test01"));
+        System.out.println(result);
     }
 }

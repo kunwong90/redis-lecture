@@ -60,18 +60,18 @@ public class RedisDistributedFairLock {
             String value = identifier + ":" + key + ":" + threadId + ":" + UUID.randomUUID().toString();
             RedisScript<Void> redisScript = new DefaultRedisScript<>(LUA_DELETE_LIST, Void.class);
             redisTemplate.execute(redisScript, Collections.singletonList(listKey), identifier, value);
-            //redisTemplate.opsForList().rightPush(listKey, value);
             while (true) {
                 String listFirstValue = redisTemplate.opsForList().index(listKey, 0);
-                //LOGGER.info("pushValue = {}, popValue = {}", value, result);
+                // 防止以为情况，比如Redis没做持久化导致数据异常丢失
+                if (StringUtils.isBlank(listFirstValue)) {
+                    return true;
+                }
                 if (StringUtils.equals(value, listFirstValue)) {
-                    //Boolean success = redisTemplate.opsForValue().setIfAbsent(key, value, time, timeUnit);
                     String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
                             "if (result ~= false) then return 1; else return 0; end;";
                     Long result = redisTemplate.execute(new DefaultRedisScript<>(lua, Long.class), Collections.singletonList(key), value, String.valueOf(timeUnit.toSeconds(time)));
                     if (result != null && result == 1) {
                         threadLocal.set(value);
-                        //LOGGER.info("==自旋获取锁成功== " + value);
                         redisTemplate.opsForList().leftPop(listKey);
                         // 获取锁成功
                         return true;
@@ -95,7 +95,6 @@ public class RedisDistributedFairLock {
     public void unlock(String key) {
         try {
             String value = threadLocal.get();
-            //LOGGER.info("==释放锁==" + threadId);
             // 如果业务执行时间过长导致锁自动释放(key时间过期自动删除),当前线程认为自己当前还持有锁
             RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end;", Boolean.class);
             redisTemplate.execute(redisScript, Collections.singletonList(key), value);
