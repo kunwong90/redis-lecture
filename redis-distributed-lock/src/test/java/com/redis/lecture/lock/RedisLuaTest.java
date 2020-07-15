@@ -234,4 +234,17 @@ public class RedisLuaTest extends BaseTest {
         String result = redisTemplate.execute(redisScript, Arrays.asList("test1", "field"));
         System.out.println(result);
     }
+
+    @Test
+    public void expireTest() {
+        /**
+         * lua脚本只能保障执行过程中不被其他线程抢占执行，
+         * 不能保证原子操作，如果第二个语句写成了expir
+         * 就会导致set命令执行成功而设置过期时间失败，造成key永远不会过期
+         */
+        String lua = "redis.call('set', KEYS[1], ARGV[1]);" +
+                "redis.call('expire', KEYS[1], ARGV[2])";
+        RedisScript<Void> redisScript = new DefaultRedisScript<>(lua, Void.class);
+        redisTemplate.execute(redisScript, Collections.singletonList("test1"), "value1", String.valueOf(20));
+    }
 }
