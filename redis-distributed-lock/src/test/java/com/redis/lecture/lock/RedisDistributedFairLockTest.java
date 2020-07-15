@@ -64,14 +64,18 @@ public class RedisDistributedFairLockTest extends BaseTest {
                     System.out.println(key + ":" + Thread.currentThread().getId() + ",开始执行时间:" + Instant.now().toString());
                     boolean result = fairLock.lockPro(key, 2);
                     System.out.println(result);
-                    System.out.println(key + " 获取锁成功时间:" + Instant.now().toString());
-                    try {
-                        TimeUnit.SECONDS.sleep(1);
-                    } catch (Exception ignore) {
+                    if (result) {
+                        System.out.println(key + " 获取锁成功,时间:" + Instant.now().toString());
+                        try {
+                            TimeUnit.SECONDS.sleep(1);
+                        } catch (Exception ignore) {
 
-                    } finally {
-                        //fairLock1.unlock(key);
-                        System.out.println(key + " 释放锁成功时间:" + Instant.now().toString());
+                        } finally {
+                            //fairLock1.unlock(key);
+                            System.out.println(key + " 释放锁成功时间:" + Instant.now().toString());
+                        }
+                    } else {
+                        System.err.println(key + " 获取锁失败,时间:" + Instant.now().toString());
                     }
                 });
             });

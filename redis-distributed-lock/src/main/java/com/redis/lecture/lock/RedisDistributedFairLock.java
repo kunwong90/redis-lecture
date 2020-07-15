@@ -154,45 +154,50 @@ public class RedisDistributedFairLock {
             Long listLength = redisTemplate.execute(redisScript, Arrays.asList(listKey, hashKey), identifier, value, String.valueOf(System.currentTimeMillis()), String.valueOf(timeUnit.toMillis(time) + 1000));
             LOGGER.info("value = {}, size = {}, expire time = {}", value, listLength, (System.currentTimeMillis() + (timeUnit.toMillis(time) +1000)*listLength));
             while (true) {
-                String listFirstValue = redisTemplate.opsForList().index(listKey, 0);
-                // 防止以为情况，比如Redis没做持久化导致数据异常丢失
-                if (StringUtils.isBlank(listFirstValue)) {
-                    LOGGER.info("{} 队列为空", listKey);
-                    redisTemplate.delete(hashKey);
-                    return true;
-                }
-                // 从hash上根据field获取value，判断是否过期
-                String millsStr = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('hget', KEYS[1], KEYS[2])", String.class), Arrays.asList(hashKey, listFirstValue));
-                if (StringUtils.isBlank(millsStr)) {
-                    //LOGGER.info("{}, {} 获取值为空.value = {}", hashKey, listFirstValue, value);
-                    continue;
-                }
-                long mills = Long.parseLong(millsStr);
-                if (mills <= System.currentTimeMillis()) {
-                    // 过期
-                    LOGGER.info("expire.value = {}, expire = {}", listFirstValue, millsStr);
-                    redisTemplate.execute(new DefaultRedisScript<>("redis.call('lpop', KEYS[1]);" +
-                            "redis.call('hdel', KEYS[2], KEYS[3]);", Void.class), Arrays.asList(listKey, hashKey, listFirstValue));
-                    return false;
-                }
-                if (StringUtils.equals(value, listFirstValue)) {
-                    String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
-                            "if (result ~= false) then return 1; else return 0; end;";
-                    Long result = redisTemplate.execute(new DefaultRedisScript<>(lua, Long.class), Collections.singletonList(key), value, String.valueOf(timeUnit.toSeconds(time)));
-                    if (result != null && result == 1) {
-                        threadLocal.set(value);
-                        redisTemplate.execute(new DefaultRedisScript<>("redis.call('lpop', KEYS[1]); redis.call('hdel', KEYS[2], KEYS[3]);" +
-                                "local exists = redis.call('exists', KEYS[1]);" +
-                                "if exists == 0 then redis.call('del', KEYS[2]); end;", Void.class), Arrays.asList(listKey, hashKey, listFirstValue));
-                        //LOGGER.info("value = {} 已被删除", value);
-                        // 获取锁成功
+                try {
+                    String listFirstValue = redisTemplate.opsForList().index(listKey, 0);
+                    // 防止以为情况，比如Redis没做持久化导致数据异常丢失
+                    if (StringUtils.isBlank(listFirstValue)) {
+                        LOGGER.info("{} 队列为空", listKey);
+                        redisTemplate.delete(hashKey);
                         return true;
                     }
-                }
-                try {
-                    TimeUnit.MILLISECONDS.sleep(200);
-                } catch (Exception ignore) {
+                    // 从hash上根据field获取value，判断是否过期
+                    String millsStr = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('hget', KEYS[1], KEYS[2])", String.class), Arrays.asList(hashKey, listFirstValue));
+                    if (StringUtils.isBlank(millsStr)) {
+                        // TODO 要不要从list中删除?
+                        //LOGGER.info("{}, {} 获取值为空.value = {}", hashKey, listFirstValue, value);
+                        continue;
+                    }
+                    long mills = Long.parseLong(millsStr);
+                    if (mills <= System.currentTimeMillis()) {
+                        // 过期
+                        LOGGER.info("expire.value = {}, expire = {}", listFirstValue, millsStr);
+                        redisTemplate.execute(new DefaultRedisScript<>("redis.call('lpop', KEYS[1]);" +
+                                "redis.call('hdel', KEYS[2], KEYS[3]);", Void.class), Arrays.asList(listKey, hashKey, listFirstValue));
+                        return false;
+                    }
+                    if (StringUtils.equals(value, listFirstValue)) {
+                        String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
+                                "if (result ~= false) then return 1; else return 0; end;";
+                        Long result = redisTemplate.execute(new DefaultRedisScript<>(lua, Long.class), Collections.singletonList(key), value, String.valueOf(timeUnit.toSeconds(time)));
+                        if (result != null && result == 1) {
+                            threadLocal.set(value);
+                            redisTemplate.execute(new DefaultRedisScript<>("redis.call('lpop', KEYS[1]); redis.call('hdel', KEYS[2], KEYS[3]);" +
+                                    "local exists = redis.call('exists', KEYS[1]);" +
+                                    "if exists == 0 then redis.call('del', KEYS[2]); end;", Void.class), Arrays.asList(listKey, hashKey, listFirstValue));
+                            //LOGGER.info("value = {} 已被删除", value);
+                            // 获取锁成功
+                            return true;
+                        }
+                    }
+                    try {
+                        TimeUnit.MILLISECONDS.sleep(200);
+                    } catch (Exception ignore) {
 
+                    }
+                } catch (Exception e) {
+                    LOGGER.error("while loop error.", e);
                 }
             }
         } catch (Exception e) {

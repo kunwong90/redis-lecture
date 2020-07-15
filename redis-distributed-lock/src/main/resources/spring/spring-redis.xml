@@ -11,6 +11,9 @@
     <!--连接池配置-->
     <bean id="defaultLettucePool" class="org.springframework.data.redis.connection.lettuce.DefaultLettucePool">
         <property name="poolConfig" ref="genericObjectPoolConfig"/>
+        <!--<property name="hostName" value="192.168.65.128"/>-->
+        <property name="port" value="6379"/>
+        <property name="timeout" value="2000"/>
     </bean>
 
     <bean id="genericObjectPoolConfig" class="org.apache.commons.pool2.impl.GenericObjectPoolConfig">
