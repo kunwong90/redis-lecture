@@ -236,6 +236,18 @@ public class RedisLuaTest extends BaseTest {
     }
 
     @Test
+    public void hget1() {
+        /**
+         * 没有返回null
+         */
+        String lua = "local result = redis.call('hget', KEYS[1], KEYS[2]);" +
+                "if result ~= false then return result; else return nil;end;";
+        RedisScript<String> redisScript = new DefaultRedisScript<>(lua, String.class);
+        String result = redisTemplate.execute(redisScript, Arrays.asList("test1", "field"));
+        System.out.println(result);
+    }
+
+    @Test
     public void expireTest() {
         /**
          * lua脚本只能保障执行过程中不被其他线程抢占执行，

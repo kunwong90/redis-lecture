@@ -163,10 +163,16 @@ public class RedisDistributedFairLock {
                         return true;
                     }
                     // 从hash上根据field获取value，判断是否过期
-                    String millsStr = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('hget', KEYS[1], KEYS[2])", String.class), Arrays.asList(hashKey, listFirstValue));
+                    String millsStr = redisTemplate.execute(new DefaultRedisScript<>(
+                            "return redis.call('hget', KEYS[1], KEYS[2]);", String.class), Arrays.asList(hashKey, listFirstValue, listKey));
                     if (StringUtils.isBlank(millsStr)) {
                         // TODO 要不要从list中删除?
-                        //LOGGER.info("{}, {} 获取值为空.value = {}", hashKey, listFirstValue, value);
+                        /**
+                         * 走到这里的几种场景:
+                         * 1.并发时都是和list中的第一个值比较，当第一个获取成功时删除了，其他线程可能还是和第一个值毕节
+                         * 2.redis开启了持久化，导致数据不一致
+                         */
+                        LOGGER.warn("hashKey = {}, listFirstValue = {} 获取值为空.value = {}", hashKey, listFirstValue, value);
                         continue;
                     }
                     long mills = Long.parseLong(millsStr);
