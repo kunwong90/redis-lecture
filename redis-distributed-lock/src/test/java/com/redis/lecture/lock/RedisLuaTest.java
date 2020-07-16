@@ -259,4 +259,59 @@ public class RedisLuaTest extends BaseTest {
         RedisScript<Void> redisScript = new DefaultRedisScript<>(lua, Void.class);
         redisTemplate.execute(redisScript, Collections.singletonList("test1"), "value1", String.valueOf(20));
     }
+
+    @Test
+    public void listHashTest() {
+        String listKey = "listKey1";
+        String hashKey = "hashKey";
+        String listFirstValue = redisTemplate.execute(new DefaultRedisScript<>(
+                "local result = redis.call('LINDEX', KEYS[1], 0);" +
+                        "if (result ~= false) then return result;else redis.call('del', KEYS[2]);return nil;end;", String.class), Arrays.asList(listKey, hashKey));
+        System.out.println(listFirstValue);
+    }
+
+    @Test
+    public void luaTest() {
+        String key = "key";
+        String listKey = "listKey";
+        String hashKey = "hashKey";
+        String listFirstValue = "listFirstValue";
+        String value = "value";
+        String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
+                "if (result ~= false) then " +
+                "redis.call('lpop', KEYS[2]); " +
+                "redis.call('hdel', KEYS[3], KEYS[4]);" +
+                "local exists = redis.call('exists', KEYS[2]);" +
+                "if exists == 0 then " +
+                "redis.call('del', KEYS[3]);" +
+                "end;" +
+                "return 1;" +
+                "else return 0;" +
+                "end;";
+        Boolean result = redisTemplate.execute(new DefaultRedisScript<>(lua, Boolean.class), Arrays.asList(key, listKey, hashKey, listFirstValue), value, String.valueOf(200));
+        System.out.println(result);
+    }
+
+    @Test
+    public void lua1Test() {
+
+        String listKey = "listKey";
+        String key = "key";
+        String value = "value";
+        long time = 20;
+        String lua = "local listFirstValue = redis.call('LINDEX', KEYS[1], 0);" +
+                "if listFirstValue == false then " +
+                "return nil;" +
+                "elseif (listFirstValue == ARGV[1]) then " +
+                "local result = redis.call('set', KEYS[2], ARGV[1], 'ex', ARGV[2], 'nx');" +
+                "if (result ~= false) then " +
+                "redis.call('lpop', KEYS[1]);" +
+                "return 1;" +
+                "else return nil;" +
+                "end;" +
+                "end;";
+        Boolean result = redisTemplate.execute(new DefaultRedisScript<>(lua, Boolean.class), Arrays.asList(listKey, key), value, String.valueOf(TimeUnit.SECONDS.toSeconds(time)));
+        System.out.println(result);
+
+    }
 }

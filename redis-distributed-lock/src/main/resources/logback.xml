@@ -4,7 +4,7 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <!--<filter class="com.logback.example.SampleFilter"/>-->
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %c-%L - %msg%n</Pattern>
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %c-%L - %X{traceId} - %msg%n</Pattern>
         </encoder>
     </appender>
 
@@ -12,7 +12,7 @@
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>/opt/logs/redis.log</file>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %c-%L - %msg%n</Pattern>
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %c-%L - %X{traceId} - %msg%n</Pattern>
         </encoder>
     </appender>
 
