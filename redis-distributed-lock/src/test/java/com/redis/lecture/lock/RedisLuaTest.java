@@ -314,4 +314,48 @@ public class RedisLuaTest extends BaseTest {
         System.out.println(result);
 
     }
+
+    @Test
+    public void luaTimeTest() {
+        String time = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('time')", String.class), Collections.EMPTY_LIST);
+        System.out.println(time);
+    }
+
+    void lua() {
+        String lua = "redis.call('rpush', KEYS[1], ARGV[1]);" +
+                "local listlength = redis.call('llen', KEYS[1]);" +
+                "redis.call('zadd', KEYS[2], ARGV[3], ARGV[1])" +
+                "local expire = tonumber(ARGV[2]) * tonumber(listlength);" +
+                "redis.call('expire', KEYS[1], expire);" +
+                "redis.call('expire', KEYS[2], expire);" +
+                "return listlength;";
+        while (true) {
+            /**
+             * 0表示list为空
+             * 1表示zset没找到对应score或score过期
+             * 2表示获取锁成功
+             * 3表示获取锁失败
+             */
+            String lua1 = "local listFirstValue = redis.call('lindex', KEYS[1], 0);" +
+                    "if (listFirstValue == false) then " +
+                    "redis.call('del', KEYS[2]); " +
+                    "return 0;" +
+                    "end;" +
+                    "local expire = redis.call('ZSCORE', KEYS[2], listFirstValue);" +
+                    "if (expire == false or expire < ARGV[1]) then " +
+                    "redis.call('lpop', KEYS[1]);" +
+                    "redis.call('zrem', KEYS[2], listFirstValue)" +
+                    "return 1;" +
+                    "end;" +
+                    "if (listFirstValue == ARGV[2]) then " +
+                    "local result = redis.call('set', KEYS[2], ARGV[1], 'ex', ARGV[2], 'nx');" +
+                    "if (result ~= false) then " +
+                    "redis.call('lpop', KEYS[1]);" +
+                    "redis.call('zrem', KEYS[2], listFirstValue);" +
+                    "return 2;" +
+                    "else return 3;" +
+                    "end;" +
+                    "end;";
+        }
+    }
 }

@@ -65,7 +65,7 @@ public class RedisDistributedFairLock {
             redisTemplate.execute(redisScript, Collections.singletonList(listKey), identifier, value);
             while (true) {
                 String listFirstValue = redisTemplate.opsForList().index(listKey, 0);
-                // 防止以为情况，比如Redis没做持久化导致数据异常丢失
+                // 防止意外情况，比如Redis没做持久化导致数据异常丢失
                 if (StringUtils.isBlank(listFirstValue)) {
                     return true;
                 }
@@ -159,7 +159,7 @@ public class RedisDistributedFairLock {
                     String listFirstValue = redisTemplate.execute(new DefaultRedisScript<>(
                             "local result = redis.call('LINDEX', KEYS[1], 0);" +
                                     "if (result ~= false) then return result;else redis.call('del', KEYS[2]);return nil;end;", String.class), Arrays.asList(listKey, hashKey));
-                    // 防止以为情况，比如Redis没做持久化导致数据异常丢失
+                    // 防止意外情况，比如Redis没做持久化导致数据异常丢失
                     if (StringUtils.isBlank(listFirstValue)) {
                         LOGGER.info("{} 队列为空", listKey);
                         //redisTemplate.delete(hashKey);
@@ -236,24 +236,16 @@ public class RedisDistributedFairLock {
 
     public boolean lock1(String key, long time) {
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
-        String identifier = uuid.toString();
         try {
             String threadId = String.valueOf(Thread.currentThread().getId());
-            String value = identifier + ":" + key + ":" + threadId + ":" + UUID.randomUUID().toString();
+            String value = key + ":" + threadId + ":" + UUID.randomUUID().toString();
             RedisScript<Long> redisScript = new DefaultRedisScript<>(
-                    "local list = redis.call('lrange', KEYS[1], 0, -1);" +
-                            "for index,value in pairs(list) do local prefix = ARGV[1];" +
-                            "if (string.sub(value, 0, #prefix) ~= prefix) then " +
-                            "redis.call('LREM', KEYS[1], 0, value); " +
-                            "end;" +
-                            "end;" +
-                            "redis.call('rpush', KEYS[1], ARGV[2]);" +
+                            "redis.call('rpush', KEYS[1], ARGV[1]);" +
                             "local listlength = redis.call('llen', KEYS[1]);" +
-                            "redis.call('expire', KEYS[1], tonumber(ARGV[3]) * tonumber(listlength));" +
+                            "redis.call('expire', KEYS[1], tonumber(ARGV[2]) * tonumber(listlength));" +
                             "return listlength;", Long.class);
             long expireTime = TimeUnit.SECONDS.toSeconds(time);
-            redisTemplate.execute(redisScript, Collections.singletonList(listKey), identifier, value, String.valueOf(expireTime));
-
+            redisTemplate.execute(redisScript, Collections.singletonList(listKey), value, String.valueOf(expireTime));
             while (true) {
                 /**
                  * 0表示list队列为空
@@ -278,8 +270,8 @@ public class RedisDistributedFairLock {
                         return true;
                     }
                     TimeUnit.MILLISECONDS.sleep(200);
-                } catch (Exception ignore) {
-                    LOGGER.error("while loop error.", ignore);
+                } catch (Exception e) {
+                    LOGGER.error("while loop error.", e);
                 }
             }
         } catch (Exception e) {
