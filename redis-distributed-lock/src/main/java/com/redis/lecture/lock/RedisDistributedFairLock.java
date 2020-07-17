@@ -1,6 +1,5 @@
 package com.redis.lecture.lock;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.Cursor;
@@ -12,11 +11,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -47,7 +42,7 @@ public class RedisDistributedFairLock {
         this.uuid = UUID.randomUUID();
     }
 
-    private static final String LUA_DELETE_LIST =
+    /*private static final String LUA_DELETE_LIST =
             "local list = redis.call('lrange', KEYS[1], 0, -1);" +
             "for index,value in pairs(list) do local prefix = ARGV[1];" +
                 "if (string.sub(value, 0, #prefix) ~= prefix) then " +
@@ -56,6 +51,9 @@ public class RedisDistributedFairLock {
             "end;" +
             "redis.call('rpush', KEYS[1], ARGV[2]);";
 
+    public boolean lock(String key, long time) {
+        return lock(key, time, TimeUnit.SECONDS);
+    }
 
     public boolean lock(String key, long time, TimeUnit timeUnit) {
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
@@ -92,7 +90,7 @@ public class RedisDistributedFairLock {
             LOGGER.error("lock error.", e);
             return true;
         }
-    }
+    }*/
 
     /**
      * 释放锁
@@ -111,9 +109,7 @@ public class RedisDistributedFairLock {
     }
 
 
-    public boolean lock(String key, long time) {
-        return lock(key, time, TimeUnit.SECONDS);
-    }
+
 
     public Set<String> scan(String matchKey) {
         return redisTemplate.execute((RedisCallback<Set<String>>) connection -> {
@@ -126,13 +122,7 @@ public class RedisDistributedFairLock {
         });
     }
 
-    /**
-     * lock升级版，做了一些优化
-     * @param key
-     * @param time
-     * @return
-     */
-    public boolean lockPro(String key, long time) {
+    /*public boolean lockPro(String key, long time) {
         return lockPro(key, time, TimeUnit.SECONDS);
     }
     public boolean lockPro(String key, long time, TimeUnit timeUnit) {
@@ -172,11 +162,11 @@ public class RedisDistributedFairLock {
                             "return redis.call('hget', KEYS[1], KEYS[2]);", String.class), Arrays.asList(hashKey, listFirstValue, listKey));
                     if (StringUtils.isBlank(millsStr)) {
                         // TODO 要不要从list中删除?
-                        /**
+                        *//**
                          * 走到这里的几种场景:
                          * 1.并发时都是和list中的第一个值比较，当第一个获取成功时删除了，其他线程可能还是和第一个值毕节
                          * 2.redis开启了持久化，导致数据不一致
-                         */
+                         *//*
                         LOGGER.warn("value = {} 获取值为空.hashKey = {}, listFirstValue = {}", value, hashKey, listFirstValue);
                         continue;
                     }
@@ -189,7 +179,7 @@ public class RedisDistributedFairLock {
                         return false;
                     }
                     if (StringUtils.equals(value, listFirstValue)) {
-                        /*String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
+                        *//*String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
                                 "if (result ~= false) then return 1; else return 0; end;";
                         Long result = redisTemplate.execute(new DefaultRedisScript<>(lua, Long.class), Collections.singletonList(key), value, String.valueOf(timeUnit.toSeconds(time)));
                         if (result != null && result == 1) {
@@ -200,7 +190,7 @@ public class RedisDistributedFairLock {
                             //LOGGER.info("value = {} 已被删除", value);
                             // 获取锁成功
                             return true;
-                        }*/
+                        }*//*
                         String lua = "local result = redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx');" +
                                 "if (result ~= false) then " +
                                 "redis.call('lpop', KEYS[2]); " +
@@ -233,7 +223,7 @@ public class RedisDistributedFairLock {
             LOGGER.error("lock error.", e);
             return true;
         }
-    }
+    }*/
 
 
     /**
@@ -288,7 +278,12 @@ public class RedisDistributedFairLock {
         }
     }
 
-
+    /**
+     * 使用redis list + zset实现
+     * @param key
+     * @param time
+     * @return
+     */
     public boolean lock2(String key, long time) {
         String listKey = PREFIX_LIST_QUEUE_NAME + key;
         String zSetKey = PREFIX_ZSET_NAME + key;
@@ -306,12 +301,11 @@ public class RedisDistributedFairLock {
                             "end;" +
                     "redis.call('rpush', KEYS[1], ARGV[1]);" +
                     "local listlength = redis.call('llen', KEYS[1]);" +
-                    "redis.call('zadd', KEYS[2], ARGV[2] + ARGV[3]*listlength, ARGV[1]);" +
+                    "redis.call('zadd', KEYS[2], ARGV[2] + ARGV[3] * listlength, ARGV[1]);" +
                     //"local expire = tonumber(ARGV[2]) * tonumber(listlength);" +
                     //"redis.call('expire', KEYS[1], expire);" +
                     //"redis.call('expire', KEYS[2], expire);" +
                     "return listlength;", Long.class), Arrays.asList(listKey, zSetKey), value, String.valueOf(System.currentTimeMillis()), String.valueOf(TimeUnit.SECONDS.toMillis(time)), prefix);
-            //System.out.println("value = " + value + " ,size = " + size);
             while (true) {
                 /**
                  * 0表示list为空
@@ -345,9 +339,8 @@ public class RedisDistributedFairLock {
                 try {
                     Long result = redisTemplate.execute(new DefaultRedisScript<>(lua, Long.class),
                             Arrays.asList(listKey, zSetKey, key), String.valueOf(System.currentTimeMillis()), value, String.valueOf(TimeUnit.SECONDS.toSeconds(time)));
-                    //System.out.println(result);
                     if (result != null && (result == 0 || result == 1 || result == 2)) {
-                        System.out.println(result);
+                        LOGGER.info("result = {}", result);
                         return true;
                     }
                     TimeUnit.MILLISECONDS.sleep(200);
