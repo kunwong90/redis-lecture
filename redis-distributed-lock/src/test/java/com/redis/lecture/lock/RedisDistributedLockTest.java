@@ -56,21 +56,4 @@ public class RedisDistributedLockTest {
         redisDistributedLock.unlock(KEY);
 
     }
-
-    @Test
-    public void reentrantLockTest() {
-        boolean result = redisDistributedLock.reentrantLock(KEY, 1, TimeUnit.MINUTES);
-        LOGGER.info("线程 {} 获取锁 {}", Thread.currentThread().getId(), result ? "成功" : "失败");
-        result = redisDistributedLock.reentrantLock(KEY, 1, TimeUnit.MINUTES);
-        LOGGER.info("线程 {} 获取锁 {}", Thread.currentThread().getId(), result ? "成功" : "失败");
-        result = redisDistributedLock.reentrantLock(KEY, 1, TimeUnit.MINUTES);
-        LOGGER.info("线程 {} 获取锁 {}", Thread.currentThread().getId(), result ? "成功" : "失败");
-        redisDistributedLock.reentrantUnlock(KEY);
-        redisDistributedLock.reentrantUnlock(KEY);
-
-        threadPoolExecutor.execute(() -> {
-            boolean result1 = redisDistributedLock.reentrantLock(KEY, 1, TimeUnit.MINUTES);
-            LOGGER.info("线程 {} 获取锁 {}", Thread.currentThread().getId(), result1 ? "成功" : "失败");
-        });
-    }
 }

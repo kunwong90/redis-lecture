@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -97,63 +96,6 @@ public class RedisDistributedLock {
             redisTemplate.execute(redisScript, Arrays.asList(key, nanoTime));
         } finally {
             threadLocal.remove();
-        }
-    }
-
-    /**
-     * 可重入锁,参考 Redisson
-     *
-     * @param key
-     * @param time
-     * @param timeUnit
-     * @return
-     */
-    public Boolean reentrantLock(String key, long time, TimeUnit timeUnit) {
-        String script = "if (redis.call('exists', KEYS[1]) == 0) then " +
-                "redis.call('hincrby', KEYS[1], ARGV[2], 1); " +
-                "redis.call('expire', KEYS[1], ARGV[1]); " +
-                "return true; " +
-                "end; " +
-                "if (redis.call('hexists', KEYS[1], ARGV[2]) == 1) then " +
-                "redis.call('hincrby', KEYS[1], ARGV[2], 1); " +
-                "redis.call('expire', KEYS[1], ARGV[1]); " +
-                "return true; " +
-                "end; " +
-                "return false;";
-        try {
-            RedisScript<Boolean> redisScript = new DefaultRedisScript<>(script, Boolean.class);
-            return redisTemplate.execute(redisScript, Collections.singletonList(key), String.valueOf(timeUnit.toSeconds(time)), key + ":" + Thread.currentThread().getId());
-        } catch (Exception e) {
-            LOGGER.error("lock fail.", e);
-            return false;
-        }
-    }
-
-
-    public void reentrantUnlock(String key) {
-        String script = "if (redis.call('hexists', KEYS[1], ARGV[2]) == 0) then " +
-                "return nil;" +
-                "end; " +
-                "local counter = redis.call('hincrby', KEYS[1], ARGV[2], -1); " +
-                "if (counter > 0) then " +
-                "redis.call('expire', KEYS[1], ARGV[1]); " +
-                "return nil; " +
-                "else " +
-                "redis.call('del', KEYS[1]); " +
-                //"redis.call('publish', KEYS[2], ARGV[1]); " +
-                "return nil; " +
-                "end; " +
-                "return nil;";
-        Long expire = redisTemplate.getExpire(key, TimeUnit.SECONDS);
-        if (expire != null && expire > 0) {
-            try {
-                RedisScript<Void> redisScript = new DefaultRedisScript<>(script);
-                redisTemplate.execute(redisScript, Collections.singletonList(key), String.valueOf(expire), key + ":" + Thread.currentThread().getId());
-            } catch (Exception e) {
-                LOGGER.error("release lock fail.", e);
-            }
-        } else {
-            LOGGER.warn("key:{} not exist", key);
         }
     }
 }
