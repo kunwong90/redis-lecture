@@ -329,4 +329,16 @@ public class RedisLuaTest extends BaseTest {
         String result = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('ZRANGE', 'distributed_lock_timeout:test12', 0, -1, 'WITHSCORES');", String.class), Collections.emptyList());
         System.out.println(result);
     }
+
+    @Test
+    public void zrangeTest1() {
+        Long result = redisTemplate.execute(new DefaultRedisScript<>(
+                "local score = redis.call('ZREVRANGE', 'distributed_lock_timeout:test12', 0, -1, 'WITHSCORES');" +
+                        "redis.log(redis.LOG_NOTICE, next(score) == nil and 'true' or 'false');" +
+                        "local score1 = -1;" +
+                        "if (next(score) ~= nil) then score1 = score[2];end;" +
+                        "redis.log(redis.LOG_NOTICE, score1);" +
+                        "return tonumber(score1);", Long.class), Collections.emptyList());
+        System.out.println(result);
+    }
 }
