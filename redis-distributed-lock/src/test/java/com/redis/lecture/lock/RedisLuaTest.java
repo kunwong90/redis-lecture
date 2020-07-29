@@ -320,4 +320,13 @@ public class RedisLuaTest extends BaseTest {
         String time = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('time')", String.class), Collections.EMPTY_LIST);
         System.out.println(time);
     }
+
+    @Test
+    public void zrangeTest() {
+        /**
+         * 可以返回score最大值
+         */
+        String result = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('ZRANGE', 'distributed_lock_timeout:test12', 0, -1, 'WITHSCORES');", String.class), Collections.emptyList());
+        System.out.println(result);
+    }
 }
