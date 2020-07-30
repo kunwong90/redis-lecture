@@ -317,8 +317,15 @@ public class RedisLuaTest extends BaseTest {
 
     @Test
     public void luaTimeTest() {
-        String time = redisTemplate.execute(new DefaultRedisScript<>("return redis.call('time')", String.class), Collections.EMPTY_LIST);
+        /**
+         * time
+         * 一个包含两个字符串的列表： 第一个字符串是当前时间(以 UNIX 时间戳格式表示)，而第二个字符串是当前这一秒钟已经逝去的微秒数。
+         */
+        Long time = redisTemplate.execute(new DefaultRedisScript<>("local table = redis.call('time');" +
+                "local time = tonumber(table[1])*1000 + tonumber(table[2])/1000;" +
+                "return time;", Long.class), Collections.EMPTY_LIST);
         System.out.println(time);
+        System.out.println(System.currentTimeMillis());
     }
 
     @Test
@@ -339,6 +346,14 @@ public class RedisLuaTest extends BaseTest {
                         "if (next(score) ~= nil) then score1 = score[2];end;" +
                         "redis.log(redis.LOG_NOTICE, score1);" +
                         "return tonumber(score1);", Long.class), Collections.emptyList());
+        System.out.println(result);
+    }
+
+    @Test
+    public void luaGet() {
+        Long result = redisTemplate.execute(new DefaultRedisScript<>("local result = redis.call('get', KEYS[1]);" +
+                "if (result == false) then return tonumber(-1);" +
+                "else return tonumber(result);end;", Long.class), Arrays.asList("test"));
         System.out.println(result);
     }
 }
