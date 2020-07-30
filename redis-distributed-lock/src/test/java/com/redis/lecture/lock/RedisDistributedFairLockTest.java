@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +28,8 @@ public class RedisDistributedFairLockTest extends BaseTest {
 
     @Resource
     private RedisTemplate<String, String> redisTemplate;
+
+    DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss:SSS");
 
 
     @Before
@@ -95,6 +98,60 @@ public class RedisDistributedFairLockTest extends BaseTest {
                     } else {
                         //System.err.println(key + " 获取锁失败,时间:" + LocalDateTime.now());
                         LOGGER.error(key + " 获取锁失败,时间:" + LocalDateTime.now());
+                    }
+                    MDC.remove(TracerUtils.TRACE_ID);
+                });
+            });
+        });
+        threadPoolExecutor.awaitTermination(10, TimeUnit.MINUTES);
+    }
+
+    /*@Test
+    public void lock3Test() throws InterruptedException {
+        IntStream.range(0, 20).parallel().forEach(value1 -> {
+            IntStream.range(0, 5).parallel().forEach(value -> {
+                threadPoolExecutor.execute(() -> {
+                    MDC.put(TracerUtils.TRACE_ID, TraceIdGenerator.generate());
+                    String key = "test" + value1;
+                    boolean result = fairLock.lock3(key, 2);
+                    if (result) {
+                        LOGGER.info(key + " 获取锁成功,时间:" + LocalDateTime.now());
+                        try {
+                            TimeUnit.SECONDS.sleep(1);
+                        } catch (Exception ignore) {
+
+                        } finally {
+                            LOGGER.info(key + " 释放锁成功时间:" + LocalDateTime.now());
+                        }
+                    } else {
+                        LOGGER.error(key + " 获取锁失败,时间:" + LocalDateTime.now());
+                    }
+                    MDC.remove(TracerUtils.TRACE_ID);
+                });
+            });
+        });
+        threadPoolExecutor.awaitTermination(10, TimeUnit.MINUTES);
+    }*/
+
+    @Test
+    public void lock4Test() throws InterruptedException {
+        IntStream.range(0, 20).parallel().forEach(value1 -> {
+            IntStream.range(0, 5).parallel().forEach(value -> {
+                threadPoolExecutor.execute(() -> {
+                    MDC.put(TracerUtils.TRACE_ID, TraceIdGenerator.generate());
+                    String key = "test" + value1;
+                    boolean result = fairLock.lock4(key, 2);
+                    if (result) {
+                        LOGGER.info(key + " 获取锁成功,时间:" + dtf.format(LocalDateTime.now()));
+                        /*try {
+                            TimeUnit.SECONDS.sleep(1);
+                        } catch (Exception ignore) {
+
+                        } finally {
+                            LOGGER.info(key + " 释放锁成功时间:" + LocalDateTime.now());
+                        }*/
+                    } else {
+                        LOGGER.error(key + " 获取锁失败,时间:" + dtf.format(LocalDateTime.now()));
                     }
                     MDC.remove(TracerUtils.TRACE_ID);
                 });
