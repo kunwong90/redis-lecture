@@ -8,8 +8,6 @@ import com.redis.lecture.util.NamedThreadFactory;
 import com.redis.lecture.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -17,7 +15,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -26,7 +24,7 @@ public class RedisDistributedLock {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RedisDistributedLock.class);
 
-    private ThreadLocal<String> threadLocal = new ThreadLocal<>();
+    private final ThreadLocal<String> threadLocal = new ThreadLocal<>();
 
     private static final Timer TIMER = new HashedWheelTimer(new NamedThreadFactory("redis-lock-timer", true));
 
@@ -55,13 +53,10 @@ public class RedisDistributedLock {
                 TIMER.newTimeout(new TimerTask() {
                     @Override
                     public void run(Timeout timeout) throws Exception {
-                        List<Object> pipelineResult = redisTemplate.executePipelined(new RedisCallback<String>() {
-                            @Override
-                            public String doInRedis(RedisConnection connection) throws DataAccessException {
-                                connection.ttl(key.getBytes(), TimeUnit.MICROSECONDS);
-                                connection.get(key.getBytes());
-                                return null;
-                            }
+                        List<Object> pipelineResult = redisTemplate.executePipelined((RedisCallback<String>) connection -> {
+                            connection.ttl(key.getBytes(), TimeUnit.MICROSECONDS);
+                            connection.get(key.getBytes());
+                            return null;
                         });
                         Long expire = (Long) pipelineResult.get(0);
                         String value = (String) pipelineResult.get(1);
@@ -70,6 +65,8 @@ public class RedisDistributedLock {
                             Boolean expireResult = redisTemplate.expire(key, time, timeUnit);
                             LOGGER.info("key:{}, set expire result = {}", key, expireResult);
                             TIMER.newTimeout(this, time - 1, timeUnit);
+                        } else if (expire != null && expire == -2) {
+                            LOGGER.info("key {} doesn't exist", key);
                         } else if (!StringUtils.isEquals(value, nanoTime)) {
                             LOGGER.warn("get redis value not equals.init value = {}, redis value = {}", nanoTime, value);
                         }
@@ -78,7 +75,7 @@ public class RedisDistributedLock {
             } else {
                 return false;
             }
-            return result;
+            return true;
         } catch (Exception e) {
             LOGGER.error("tryLock failed.", e);
             return false;
@@ -92,8 +89,8 @@ public class RedisDistributedLock {
         try {
             String nanoTime = threadLocal.get();
             // 如果业务执行时间过长导致锁自动释放(key时间过期自动删除),当前线程认为自己当前还持有锁
-            RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == KEYS[2] then return redis.call('del', KEYS[1]) else return 0 end", Boolean.class);
-            redisTemplate.execute(redisScript, Arrays.asList(key, nanoTime));
+            RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[2] then return redis.call('del', KEYS[1]) else return 0 end", Boolean.class);
+            redisTemplate.execute(redisScript, Collections.singletonList(key), nanoTime);
         } finally {
             threadLocal.remove();
         }
