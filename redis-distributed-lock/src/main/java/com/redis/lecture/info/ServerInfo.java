@@ -33,4 +33,44 @@ public class ServerInfo {
 
 
     }
+
+    public void getRedisServerMemoryInfo() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("memory");
+        System.out.println(properties);
+    }
+
+    public void getRedisServerInfo() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("server");
+        System.out.println(properties);
+    }
+
+    public void getRedisPersistence() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("persistence");
+        System.out.println(properties);
+    }
+
+    public void getRedisStats() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("stats");
+        System.out.println(properties);
+    }
+
+    public void getReplication() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("replication");
+        System.out.println(properties);
+    }
+
+    public void getRedisCPUInfo() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("cpu");
+        System.out.println(properties);
+    }
+
+    public void getCluster() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("cluster");
+        System.out.println(properties);
+    }
+
+    public void getKeyspace() {
+        Properties properties = redisTemplate.getRequiredConnectionFactory().getConnection().info("keyspace");
+        System.out.println(properties);
+    }
 }
