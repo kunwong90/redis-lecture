@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="lettuceConnectionFactory"
+          class="org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory">
+        <constructor-arg name="pool" ref="defaultLettucePool"/>
+    </bean>
+    <bean id="redisSentinelConfiguration" class="org.springframework.data.redis.connection.RedisSentinelConfiguration">
+        <constructor-arg name="propertySource" ref="propertySource"/>
+    </bean>
+
+    <bean name="propertySource" class="org.springframework.core.io.support.ResourcePropertySource">
+        <constructor-arg name="location" value="classpath:spring-redis-sentinel.properties" />
+    </bean>
+    <!--连接池配置-->
+    <bean id="defaultLettucePool" class="org.springframework.data.redis.connection.lettuce.DefaultLettucePool">
+        <constructor-arg name="sentinelConfiguration" ref="redisSentinelConfiguration"/>
+        <property name="poolConfig" ref="genericObjectPoolConfig"/>
+        <!--<property name="sentinelConfiguration" ref="redisSentinelConfiguration"/>-->
+    </bean>
+
+    <bean id="genericObjectPoolConfig" class="org.apache.commons.pool2.impl.GenericObjectPoolConfig">
+        <property name="maxIdle" value="100"/>
+        <property name="minIdle" value="8"/>
+        <property name="maxTotal" value="200"/>
+        <!-- 其他相关配置 -->
+    </bean>
+
+    <!-- redis template definition -->
+    <bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate"
+          p:connection-factory-ref="lettuceConnectionFactory" p:keySerializer-ref="stringRedisSerializer"
+          p:hashKeySerializer-ref="stringRedisSerializer" p:hashValueSerializer-ref="stringRedisSerializer"
+          p:defaultSerializer-ref="stringRedisSerializer"/>
+
+    <bean id="stringRedisSerializer" class="org.springframework.data.redis.serializer.StringRedisSerializer"/>
+</beans>
