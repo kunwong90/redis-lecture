@@ -20,6 +20,7 @@
         <constructor-arg name="sentinelConfiguration" ref="redisSentinelConfiguration"/>
         <property name="poolConfig" ref="genericObjectPoolConfig"/>
         <!--<property name="sentinelConfiguration" ref="redisSentinelConfiguration"/>-->
+        <property name="password" value="123456"/>
     </bean>
 
     <bean id="genericObjectPoolConfig" class="org.apache.commons.pool2.impl.GenericObjectPoolConfig">
