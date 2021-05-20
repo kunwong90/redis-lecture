@@ -356,4 +356,11 @@ public class RedisLuaTest extends BaseTest {
                 "else return tonumber(result);end;", Long.class), Arrays.asList("test"));
         System.out.println(result);
     }
+
+    @Test
+    public void hmgetTest() {
+        redisTemplate.execute(new DefaultRedisScript<>("local ratelimit_info = redis.pcall('HMGET',KEYS[1],'last_time','current_token');" +
+                "redis.log(redis.LOG_NOTICE, next(ratelimit_info) == nil and 'true' or 'false');" +
+                "redis.log(redis.LOG_NOTICE, ratelimit_info[1] == false and 'true' or 'false');", Void.class), Arrays.asList("test"));
+    }
 }
