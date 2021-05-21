@@ -21,7 +21,6 @@ public class TokenBucketRateLimiter implements RateLimiter {
         List<String> keyList = new ArrayList<>(1);
         keyList.add(key);
         return "1".equals(redisTemplate
-                .execute(new RedisReteLimitScript(), keyList, Integer.toString(max), Integer.toString(rate),
-                        Long.toString(System.currentTimeMillis())));
+                .execute(new RedisReteLimitScript(), keyList, Integer.toString(max), Integer.toString(rate)));
     }
 }

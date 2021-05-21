@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.UUID;
@@ -362,5 +363,14 @@ public class RedisLuaTest extends BaseTest {
         redisTemplate.execute(new DefaultRedisScript<>("local ratelimit_info = redis.pcall('HMGET',KEYS[1],'last_time','current_token');" +
                 "redis.log(redis.LOG_NOTICE, next(ratelimit_info) == nil and 'true' or 'false');" +
                 "redis.log(redis.LOG_NOTICE, ratelimit_info[1] == false and 'true' or 'false');", Void.class), Arrays.asList("test"));
+    }
+
+
+    @Test
+    public void redisTimeTest() {
+        Long time = redisTemplate.execute(new DefaultRedisScript<>("local time = redis.call('time');" +
+                "return tonumber(time[1]*1000+math.ceil(time[2]/1000));", Long.class), new ArrayList<>());
+        System.out.println(time);
+        System.out.println(System.currentTimeMillis());
     }
 }

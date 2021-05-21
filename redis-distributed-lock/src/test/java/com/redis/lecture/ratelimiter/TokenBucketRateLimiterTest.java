@@ -21,7 +21,7 @@ public class TokenBucketRateLimiterTest extends BaseTest {
         String key = "test_rateLimit_key";
         int max = 10;  //令牌桶大小
         int rate = 10; //令牌每秒恢复速度
-        int size = 1;
+        int size = 30;
         AtomicInteger successCount = new AtomicInteger(0);
         ThreadPoolExecutor executor = new ThreadPoolExecutor(10, 10, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(30));
         CountDownLatch countDownLatch = new CountDownLatch(size);
