@@ -89,7 +89,7 @@ public class RedisDistributedLock {
         try {
             String nanoTime = threadLocal.get();
             // 如果业务执行时间过长导致锁自动释放(key时间过期自动删除),当前线程认为自己当前还持有锁
-            RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[2] then return redis.call('del', KEYS[1]) else return 0 end", Boolean.class);
+            RedisScript<Boolean> redisScript = new DefaultRedisScript<>("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", Boolean.class);
             redisTemplate.execute(redisScript, Collections.singletonList(key), nanoTime);
         } finally {
             threadLocal.remove();

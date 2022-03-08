@@ -35,7 +35,7 @@ public class RedisDistributedLockTest {
     public void tryLock() {
         redisDistributedLock.tryLock(KEY, 5, TimeUnit.SECONDS);
 
-        for (int i = 0; i < 500; i++) {
+        for (int i = 0; i < 100; i++) {
             threadPoolExecutor.execute(() -> {
                 IntStream.range(0, 10).forEach(j -> {
                     boolean result = redisDistributedLock.tryLock(KEY, 3, TimeUnit.SECONDS);
@@ -49,11 +49,15 @@ public class RedisDistributedLockTest {
         }
 
         try {
-            TimeUnit.MINUTES.sleep(10);
+            TimeUnit.SECONDS.sleep(10);
         } catch (Exception ignore) {
 
         }
         redisDistributedLock.unlock(KEY);
+        try {
+            TimeUnit.SECONDS.sleep(10);
+        } catch (Exception ignore) {
 
+        }
     }
 }
