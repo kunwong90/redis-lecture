@@ -17,7 +17,7 @@ public class RedisDistributedReentrantLock extends AbstractDistributedLock {
     private static final Logger LOGGER = LoggerFactory.getLogger(RedisDistributedReentrantLock.class);
 
     @Override
-    public boolean tryLock(String key, long time, TimeUnit unit) {
+    public boolean tryLock(String key, long leaseTime, TimeUnit unit) {
         String script =
                 // key不存在,直接尝试获取
                 "if (redis.call('exists', KEYS[1]) == 0) then " +
@@ -34,7 +34,7 @@ public class RedisDistributedReentrantLock extends AbstractDistributedLock {
                 "return false;";
         try {
             RedisScript<Boolean> redisScript = new DefaultRedisScript<>(script, Boolean.class);
-            return getRedisTemplate().execute(redisScript, Collections.singletonList(key), String.valueOf(unit.toSeconds(time)), getLockName(Thread.currentThread().getId()));
+            return getRedisTemplate().execute(redisScript, Collections.singletonList(key), String.valueOf(unit.toSeconds(leaseTime)), getLockName(Thread.currentThread().getId()));
         } catch (Exception e) {
             LOGGER.error("lock failed.", e);
             return true;

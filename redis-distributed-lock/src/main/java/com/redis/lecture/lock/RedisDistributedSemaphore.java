@@ -16,7 +16,7 @@ public class RedisDistributedSemaphore extends AbstractDistributedLock {
     private static final int MAX_PERMITS = 10;
 
     @Override
-    public boolean tryLock(String key, long time, TimeUnit unit) {
+    public boolean tryLock(String key, long leaseTime, TimeUnit unit) {
         String script =
                 "local value = redis.call('get', KEYS[1]);" +
                         "if value == false then return redis.call('incr', KEYS[1]);" +

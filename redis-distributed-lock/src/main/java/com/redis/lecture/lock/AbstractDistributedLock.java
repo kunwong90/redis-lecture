@@ -18,20 +18,20 @@ public abstract class AbstractDistributedLock implements DistributedLock {
     }
 
     @Override
-    public boolean lock(String key, long time, TimeUnit unit) {
-        return false;
+    public boolean lock(String key, long leaseTime, TimeUnit unit) {
+        return tryLock(key, leaseTime, unit);
     }
 
     @Override
     public boolean unlock(String key) {
-        return false;
+        return tryUnlock(key);
     }
 
     protected String getLockName(long threadId) {
         return id + ":" + threadId;
     }
 
-    public abstract boolean tryLock(String key, long time, TimeUnit unit);
+    public abstract boolean tryLock(String key, long leaseTime, TimeUnit unit);
 
     public abstract boolean tryUnlock(String key);
 
