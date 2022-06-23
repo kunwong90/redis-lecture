@@ -47,7 +47,8 @@ public class RedisDistributedLock {
     public boolean tryLock(String key, long leaseTime, TimeUnit timeUnit) {
         String nanoTime = String.valueOf(System.nanoTime());
         try {
-            Boolean result = redisTemplate.opsForValue().setIfAbsent(key, nanoTime, leaseTime, timeUnit);
+            RedisScript<Boolean> redisScript = new DefaultRedisScript<>("return redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')", Boolean.class);
+            Boolean result = redisTemplate.execute(redisScript, Collections.singletonList(key), nanoTime, String.valueOf(leaseTime));
             if (result != null && result) {
                 threadLocal.set(nanoTime);
                 TIMER.newTimeout(new TimerTask() {
