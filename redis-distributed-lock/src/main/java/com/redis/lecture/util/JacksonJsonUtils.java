@@ -67,6 +67,9 @@ public final class JacksonJsonUtils {
      */
     public static String toJson(final Object object) {
         try {
+            if (object.getClass() == String.class) {
+                return object.toString();
+            }
             return MAPPER.writeValueAsString(object);
         } catch (IOException e) {
             LOG.warn("write to json string error: " + object, e);

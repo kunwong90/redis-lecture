@@ -30,4 +30,9 @@
           p:defaultSerializer-ref="stringRedisSerializer"/>
 
     <bean id="stringRedisSerializer" class="org.springframework.data.redis.serializer.StringRedisSerializer"/>
+
+    <bean id="myRedisSerializer" class="com.redis.lecture.redis.serializer.MyRedisSerializer"/>
+
+    <bean id="jdkSerializationRedisSerializer"
+          class="org.springframework.data.redis.serializer.JdkSerializationRedisSerializer"/>
 </beans>
