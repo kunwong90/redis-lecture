@@ -1,4 +1,4 @@
-package com.redis.lecture.util;
+package com.mybatis.utils;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonParser;
@@ -34,7 +34,7 @@ import java.util.Map;
 public final class JacksonJsonUtils {
 
     /**
-     * logger
+     * logger.
      */
     private static final Logger LOG = LoggerFactory.getLogger(JacksonJsonUtils.class);
 
@@ -67,9 +67,6 @@ public final class JacksonJsonUtils {
      */
     public static String toJson(final Object object) {
         try {
-            if (object.getClass() == String.class) {
-                return object.toString();
-            }
             return MAPPER.writeValueAsString(object);
         } catch (IOException e) {
             LOG.warn("write to json string error: " + object, e);
@@ -90,15 +87,44 @@ public final class JacksonJsonUtils {
 
     public static <T> List<T> toBeanList(String content, Class<T> clazz) {
         try {
-            return MAPPER.readValue(content, getCollectionType(List.class, clazz));
+            JavaType javaType = MAPPER.getTypeFactory().constructParametricType(List.class, clazz);
+            return MAPPER.readValue(content, javaType);
         } catch (IOException e) {
             LOG.warn("write to json string error: " + content, e);
             return null;
         }
     }
 
-    private static JavaType getCollectionType(Class<?> parametrized, Class<?>... parameterClasses) {
-        return MAPPER.getTypeFactory().constructParametricType(parametrized, parameterClasses);
+    /**
+     * 多重泛型 结构类型 OUTER<List<INNER>>
+     *
+     * @param content
+     * @param outerClass
+     * @param innerClass
+     * @param <OUTER>
+     * @param <INNER>
+     * @return
+     */
+    public static <OUTER, INNER> OUTER toBeanList(String content, Class<OUTER> outerClass, Class<INNER> innerClass) {
+        try {
+            JavaType innerJavaType = MAPPER.getTypeFactory().constructCollectionType(List.class, innerClass);
+            JavaType outerJavaType = MAPPER.getTypeFactory().constructParametricType(outerClass, innerJavaType);
+            return MAPPER.readValue(content, outerJavaType);
+        } catch (IOException e) {
+            LOG.warn("write to json string error: " + content, e);
+            return null;
+        }
+    }
+
+
+    public static <OUTER, INNER> OUTER toBean(String content, Class<OUTER> outerClass, Class<INNER> innerClass) {
+        try {
+            JavaType outerJavaType = MAPPER.getTypeFactory().constructParametricType(outerClass, innerClass);
+            return MAPPER.readValue(content, outerJavaType);
+        } catch (IOException e) {
+            LOG.warn("write to json string error: " + content, e);
+            return null;
+        }
     }
 
     /**
