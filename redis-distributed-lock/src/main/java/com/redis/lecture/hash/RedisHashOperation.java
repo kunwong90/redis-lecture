@@ -37,7 +37,7 @@ public class RedisHashOperation {
     /**
      *
      * @param key
-     * @param fieldValue 不能太多,过多 lua unpack 命令会保存
+     * @param fieldValue
      * @param timeUnit
      * @param expire
      * @return
