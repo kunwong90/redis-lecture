@@ -6,7 +6,7 @@ local max_token = tonumber(ARGV[1]);
 local token_rate = tonumber(ARGV[2]);
 local time = redis.call('time');
 --local current_time = tonumber(ARGV[3]);
-local current_time = tonumber(time[1]*1000+math.ceil(time[2]/1000));
+local current_time = tonumber(time[1] * 1000 + math.ceil(time[2] / 1000));
 local reverse_time = 1000 / token_rate;
 if (current_token == nil) then
     current_token = max_token;
