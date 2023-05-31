@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -30,6 +32,8 @@ public class RedisDistributedLock {
 
     @Resource
     private RedisTemplate<String, String> redisTemplate;
+
+    private final static Map<String, Timeout> TIMEOUT_MAP = new ConcurrentHashMap<>();
 
 
     /**
@@ -51,7 +55,7 @@ public class RedisDistributedLock {
             String result = redisTemplate.execute(redisScript, Collections.singletonList(key), nanoTime, String.valueOf(leaseTime));
             if (org.apache.commons.lang3.StringUtils.equalsIgnoreCase(result, "OK")) {
                 threadLocal.set(nanoTime);
-                TIMER.newTimeout(new TimerTask() {
+                Timeout timeout = TIMER.newTimeout(new TimerTask() {
                     @Override
                     public void run(Timeout timeout) throws Exception {
                         List<Object> pipelineResult = redisTemplate.executePipelined((RedisCallback<String>) connection -> {
@@ -65,7 +69,8 @@ public class RedisDistributedLock {
                         if (expire != null && expire > 0 && StringUtils.isEquals(value, nanoTime)) {
                             Boolean expireResult = redisTemplate.expire(key, leaseTime, timeUnit);
                             LOGGER.info("key:{}, set expire result = {}", key, expireResult);
-                            TIMER.newTimeout(this, leaseTime - 1, timeUnit);
+                            Timeout timeout1 = TIMER.newTimeout(this, leaseTime - 1, timeUnit);
+                            TIMEOUT_MAP.put(key, timeout1);
                         } else if (expire != null && expire == -2) {
                             LOGGER.info("key {} doesn't exist", key);
                         } else if (!StringUtils.isEquals(value, nanoTime)) {
@@ -73,6 +78,7 @@ public class RedisDistributedLock {
                         }
                     }
                 }, leaseTime - 1, timeUnit);
+                TIMEOUT_MAP.put(key, timeout);
             } else {
                 return false;
             }
@@ -94,6 +100,12 @@ public class RedisDistributedLock {
             redisTemplate.execute(redisScript, Collections.singletonList(key), nanoTime);
         } finally {
             threadLocal.remove();
+            Timeout timeout = TIMEOUT_MAP.remove(key);
+            if (timeout != null) {
+                if (!timeout.isExpired()) {
+                    timeout.cancel();
+                }
+            }
         }
     }
 }
