@@ -11,15 +11,17 @@
     <!--连接池配置-->
     <bean id="defaultLettucePool" class="org.springframework.data.redis.connection.lettuce.DefaultLettucePool">
         <property name="poolConfig" ref="genericObjectPoolConfig"/>
-        <!--<property name="hostName" value="192.168.65.128"/>-->
+        <property name="hostName" value="127.0.0.1"/>
         <property name="port" value="6379"/>
-        <property name="timeout" value="2000"/>
+        <property name="timeout" value="1000"/>
     </bean>
 
     <bean id="genericObjectPoolConfig" class="org.apache.commons.pool2.impl.GenericObjectPoolConfig">
         <property name="maxIdle" value="5"/>
-        <property name="minIdle" value="2"/>
-        <property name="maxTotal" value="2"/>
+        <property name="minIdle" value="5"/>
+        <property name="maxTotal" value="5"/>
+        <property name="maxWaitMillis" value="100"/>
+        <property name="blockWhenExhausted" value="false"/>
         <!-- 其他相关配置 -->
     </bean>
 
