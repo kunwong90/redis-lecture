@@ -51,8 +51,8 @@ public class RedisDistributedLock {
     public boolean tryLock(String key, long leaseTime, TimeUnit timeUnit) {
         String nanoTime = String.valueOf(System.nanoTime());
         try {
-            RedisScript<String> redisScript = new DefaultRedisScript<>("return redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2], 'NX')", String.class);
-            String result = redisTemplate.execute(redisScript, Collections.singletonList(key), nanoTime, String.valueOf(leaseTime));
+            RedisScript<String> redisScript = new DefaultRedisScript<>("return redis.call('SET', KEYS[1], ARGV[1], 'NX', 'EX', ARGV[2])", String.class);
+            String result = redisTemplate.execute(redisScript, Collections.singletonList(key), nanoTime, String.valueOf(timeUnit.toSeconds(leaseTime)));
             if (org.apache.commons.lang3.StringUtils.equalsIgnoreCase(result, "OK")) {
                 threadLocal.set(nanoTime);
                 Timeout timeout = TIMER.newTimeout(new TimerTask() {
