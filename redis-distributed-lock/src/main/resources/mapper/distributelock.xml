@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.distributed.mysql.mapper.DistributedLockMapper">
+
+    <resultMap id="distributedLock" type="com.distributed.mysql.entity.DistributedLock">
+        <id property="id" column="id"/>
+        <result property="lockKey" column="lock_key"/>
+        <result property="lockValue" column="lock_value"/>
+        <result property="leaseTime" column="lease_time"/>
+        <result property="expireDate" column="expire_date"/>
+        <result property="reentrantTimes" column="reentrant_times"/>
+        <result property="version" column="version"/>
+        <result property="addTime" column="add_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+
+    <!--With ON DUPLICATE KEY UPDATE,
+    the affected-rows value per row is 1 if the row is inserted as a new row,
+    2 if an existing row is updated, and 0 if an existing row is set to its current values. -->
+    <insert id="insertOnDuplicateKeyUpdate" parameterType="com.distributed.mysql.entity.DistributedLock">
+        insert into distribute_lock(lock_key, lock_value, lease_time, expire_date)
+        values (#{lockKey}, #{lockValue}, #{leaseTime}, #{expireDate})
+        ON DUPLICATE KEY UPDATE
+        lock_value = if(expire_date>now(),lock_value,#{lockValue}),
+        lease_time = if(expire_date>now(),lease_time,#{leaseTime}),
+        expire_date = if(expire_date>now(),expire_date,#{expireDate})
+    </insert>
+
+    <delete id="deleteById">
+        delete from distribute_lock where id = #{id}
+    </delete>
+
+    <delete id="deleteByLockKey">
+        delete from distribute_lock where lock_key = #{lockKey}
+    </delete>
+
+    <select id="existsLockKey" resultMap="distributedLock">
+        select id, expire_date, version from distribute_lock where lock_key = #{lockKey} limit 1
+    </select>
+
+
+    <insert id="insert" parameterType="com.distributed.mysql.entity.DistributedLock">
+        insert into distribute_lock(lock_key, lock_value, lease_time, expire_date, reentrant_times, version)
+        values (#{lockKey}, #{lockValue}, #{leaseTime}, #{expireDate}, #{reentrantTimes}, #{version})
+    </insert>
+
+    <update id="updateByIdWithVersion" parameterType="com.distributed.mysql.entity.DistributedLock">
+        update distribute_lock set
+        lock_value = #{lockValue},lease_time = #{leaseTime},
+        expire_date = #{expireDate},reentrant_times = #{reentrantTimes},
+        version = version + 1
+        where id = #{id} and version = #{version}
+    </update>
+</mapper>

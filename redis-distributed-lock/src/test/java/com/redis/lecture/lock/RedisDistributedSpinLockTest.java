@@ -1,5 +1,6 @@
 package com.redis.lecture.lock;
 
+import com.distributed.lock.DistributedLock;
 import org.junit.Before;
 import org.junit.Test;
 
