@@ -52,4 +52,8 @@
         version = version + 1
         where id = #{id} and version = #{version}
     </update>
+
+    <delete id="deleteByLockKeyAndLockValue">
+        delete from distribute_lock where lock_key = #{lockKey} and lock_value = #{lockValue}
+    </delete>
 </mapper>

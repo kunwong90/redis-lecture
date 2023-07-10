@@ -52,6 +52,16 @@ public class RedisDistributedSpinLock extends AbstractDistributedLock {
         return result == null || result > 0;
     }
 
+    @Override
+    public boolean tryLock(String key, String value, long leaseTime, TimeUnit timeUnit) {
+        return tryLock(key, leaseTime, timeUnit);
+    }
+
+    @Override
+    public boolean tryUnlock(String key, String value) {
+        return tryUnlock(key);
+    }
+
     private Long getTtl(String key, long leaseTime, TimeUnit unit) {
         this.lockLeaseTime = unit.toMillis(leaseTime);
         RedisScript<Long> redisScript = new DefaultRedisScript<>("if (redis.call('exists', KEYS[1]) == 0) then " +

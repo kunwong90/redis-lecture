@@ -16,6 +16,7 @@ public class MysqlDistributedOptimisticLockTest extends BaseTest {
 
     String key = "test";
 
+    String value = "value";
 
     @Test
     public void testLock() {
@@ -27,6 +28,19 @@ public class MysqlDistributedOptimisticLockTest extends BaseTest {
     @Test
     public void testUnlock() {
         boolean result = distributedLock.unlock(key);
+        System.out.println("释放锁" + (result ? "成功" : "失败"));
+    }
+
+    @Test
+    public void testLock1() {
+        boolean result = distributedLock.lock(key, value, 60, TimeUnit.SECONDS);
+        System.out.println("获取锁" + (result ? "成功" : "失败"));
+    }
+
+
+    @Test
+    public void testUnlock1() {
+        boolean result = distributedLock.unlock(key, value);
         System.out.println("释放锁" + (result ? "成功" : "失败"));
     }
 }
