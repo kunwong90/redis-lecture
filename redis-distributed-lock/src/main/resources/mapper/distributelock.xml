@@ -48,7 +48,7 @@
     <update id="updateByIdWithVersion" parameterType="com.distributed.mysql.entity.DistributedLock">
         update distribute_lock set
         lock_value = #{lockValue},lease_time = #{leaseTime},
-        expire_date = #{expireDate},reentrant_times = #{reentrantTimes},
+        expire_date = #{expireDate},
         version = version + 1
         where id = #{id} and version = #{version}
     </update>

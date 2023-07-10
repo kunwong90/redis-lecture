@@ -43,9 +43,6 @@ public class MysqlDistributedOptimisticLock extends AbstractMysqlDistributedLock
                 // 存在首先判断是否已过期,没有过期获取锁失败,过期则更新数据
                 Date expireDate = distributedLock.getExpireDate();
                 if (expireDate.before(new Date())) {
-                    // 没有过期,获取锁失败
-                    return false;
-                } else {
                     // 过期,更新数据
                     distributedLock.setLockValue(value);
                     leaseTime = timeUnit.toSeconds(leaseTime);
@@ -54,11 +51,15 @@ public class MysqlDistributedOptimisticLock extends AbstractMysqlDistributedLock
                     int count = distributedLockMapper.updateByIdWithVersion(distributedLock);
                     LOGGER.info("key = {} 受影响行数 = {}", key, count);
                     if (count == 0) {
-                        LOGGER.info("key = {} 更新失败", key);
+                        LOGGER.info("key = {} 更新失败,获取锁失败", key);
                     } else if (count == 1) {
-                        LOGGER.info("key = {} 更新成功", key);
+                        LOGGER.info("key = {} 更新成功,获取锁成功", key);
                     }
                     return count > 0;
+                } else {
+                    LOGGER.info("key = {} 锁未过期,获取锁失败", key);
+                    // 没有过期,获取锁失败
+                    return false;
                 }
             }
         } catch (DuplicateKeyException e) {
