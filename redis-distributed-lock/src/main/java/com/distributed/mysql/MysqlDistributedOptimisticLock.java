@@ -4,6 +4,7 @@ import com.distributed.lock.DistributedLock;
 import com.distributed.mysql.mapper.DistributedLockMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +65,9 @@ public class MysqlDistributedOptimisticLock implements DistributedLock {
                     return count > 0;
                 }
             }
+        } catch (DuplicateKeyException e) {
+            LOGGER.error("插入或更新导致主键或唯一索引冲突", e);
+            return false;
         } catch (Exception e) {
             LOGGER.error("key = " + key + " 执行数据库异常", e);
             return true;
