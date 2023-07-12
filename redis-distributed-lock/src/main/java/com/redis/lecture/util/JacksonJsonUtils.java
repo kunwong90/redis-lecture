@@ -1,4 +1,4 @@
-package com.mybatis.utils;
+package com.redis.lecture.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonParser;
