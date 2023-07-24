@@ -9,5 +9,5 @@ CREATE TABLE distribute_lock (
 	`version` INT(10) NOT NULL DEFAULT 0 COMMENT '版本号',
 	`add_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '添加时间',
 	`update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-	UNIQUE KEY `uk_distribute_lock_lock_key` (`lock_key`)
+	UNIQUE KEY `uk_lock_key` (`lock_key`)
 );
