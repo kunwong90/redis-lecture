@@ -10,6 +10,7 @@
     <modules>
         <module>redis-distributed-lock</module>
         <module>redis-sentinel</module>
+        <module>redis-bloomfilter</module>
     </modules>
 
     <packaging>pom</packaging>
