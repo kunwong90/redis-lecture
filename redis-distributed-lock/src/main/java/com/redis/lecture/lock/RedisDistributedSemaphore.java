@@ -54,4 +54,14 @@ public class RedisDistributedSemaphore extends AbstractDistributedLock {
         }
         return true;
     }
+
+    @Override
+    public boolean tryLock(String key, String value, long leaseTime, TimeUnit timeUnit) {
+        return tryLock(key, leaseTime, timeUnit);
+    }
+
+    @Override
+    public boolean tryUnlock(String key, String value) {
+        return tryUnlock(key);
+    }
 }

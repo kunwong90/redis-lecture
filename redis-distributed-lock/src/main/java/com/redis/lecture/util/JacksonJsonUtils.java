@@ -1,4 +1,4 @@
-package com.mybatis.utils;
+package com.redis.lecture.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonParser;
@@ -66,6 +66,12 @@ public final class JacksonJsonUtils {
      * @return the string
      */
     public static String toJson(final Object object) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof String) {
+            return object.toString();
+        }
         try {
             return MAPPER.writeValueAsString(object);
         } catch (IOException e) {
